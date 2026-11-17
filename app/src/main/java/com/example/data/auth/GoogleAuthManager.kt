@@ -21,6 +21,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 object GoogleAuthManager {
     private const val TAG = "Auth"
@@ -38,11 +39,14 @@ object GoogleAuthManager {
         onUnauthenticated: () -> Unit,
         scope: CoroutineScope
     ) {
-        if (Firebase.auth.currentUser != null) {
+        val currentUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+        if (currentUser != null) {
             onAuthSuccess()
             return
         }
-        val clientId = getWebClientId(context) ?: run {
+        val activity = context as? Activity
+        val clientId = getWebClientId(context)
+        if (activity == null || clientId == null) {
             onUnauthenticated()
             return
         }
@@ -57,7 +61,10 @@ object GoogleAuthManager {
 
         scope.launch {
             try {
-                val cred = credentialManager.getCredential(context, request).credential
+                val result = withTimeoutOrNull(2500L) {
+                    credentialManager.getCredential(activity, request)
+                }
+                val cred = result?.credential
                 if (cred is CustomCredential && cred.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val token = GoogleIdTokenCredential.createFrom(cred.data).idToken
                     Firebase.auth.signInWithCredential(

@@ -84,6 +84,7 @@ import com.example.ui.screens.VideoStudioScreen
 import com.example.ui.theme.OnlineGreen
 import com.example.ui.viewmodel.OnlineViewModel
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 
@@ -100,47 +101,53 @@ fun TimeAppShell(
     preferences: TimePreferences
 ) {
     val context = LocalContext.current
-    val credentialManager = remember(context) { CredentialManager.create(context) }
-    val repository = remember(context) { OnlineRepository(context) }
-    val mediaHelper = remember(context) { OnlineMediaHelper(context) }
-    val scope = rememberCoroutineScope()
-
-    var currentUserId by remember { mutableStateOf(Firebase.auth.currentUser?.uid) }
-    var authChecked by remember { mutableStateOf(Firebase.auth.currentUser != null) }
     var showUnauthGuide by remember { mutableStateOf(false) }
 
+    val firebaseReady = remember(context) {
+        runCatching {
+            FirebaseApp.getApps(context).isNotEmpty() || FirebaseApp.initializeApp(context) != null
+        }.getOrDefault(false)
+    }
+
+    if (!firebaseReady) {
+        if (showUnauthGuide) {
+            FirebaseGuideScreen(onBack = { showUnauthGuide = false })
+        } else {
+            FirebaseMissingConfigScreen(onOpenGuide = { showUnauthGuide = true })
+        }
+        return
+    }
+
+    val credentialManager = remember(context) { CredentialManager.create(context) }
+    val scope = rememberCoroutineScope()
+
+    var currentUserId by remember {
+        mutableStateOf(runCatching { Firebase.auth.currentUser?.uid }.getOrNull())
+    }
+
     DisposableEffect(Unit) {
+        val authInstance = runCatching { Firebase.auth }.getOrNull()
         val listener = FirebaseAuth.AuthStateListener { auth ->
             currentUserId = auth.currentUser?.uid
         }
-        Firebase.auth.addAuthStateListener(listener)
+        authInstance?.addAuthStateListener(listener)
         onDispose {
-            Firebase.auth.removeAuthStateListener(listener)
+            authInstance?.removeAuthStateListener(listener)
         }
     }
 
     LaunchedEffect(Unit) {
-        if (!authChecked) {
+        if (currentUserId == null) {
             GoogleAuthManager.attemptAutoSignIn(
                 context = context,
                 credentialManager = credentialManager,
                 onAuthSuccess = {
-                    currentUserId = Firebase.auth.currentUser?.uid
-                    authChecked = true
+                    currentUserId = runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
                 },
-                onUnauthenticated = {
-                    authChecked = true
-                },
+                onUnauthenticated = {},
                 scope = scope
             )
         }
-    }
-
-    if (!authChecked) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
     }
 
     val uid = currentUserId
@@ -151,7 +158,7 @@ fun TimeAppShell(
             AuthScreen(
                 credentialManager = credentialManager,
                 onAuthenticated = {
-                    currentUserId = Firebase.auth.currentUser?.uid
+                    currentUserId = runCatching { Firebase.auth.currentUser?.uid }.getOrNull()
                 },
                 onOpenFirebaseGuide = { showUnauthGuide = true }
             )
@@ -160,6 +167,8 @@ fun TimeAppShell(
     }
 
     key(uid) {
+        val repository = remember(context, uid) { OnlineRepository(context) }
+        val mediaHelper = remember(context, uid) { OnlineMediaHelper(context) }
         val onlineViewModel: OnlineViewModel = viewModel(
             key = "online_vm_$uid",
             factory = OnlineViewModel.Factory(
@@ -184,6 +193,42 @@ fun TimeAppShell(
                 )
             }
         )
+    }
+}
+
+@Composable
+private fun FirebaseMissingConfigScreen(
+    onOpenGuide: () -> Unit
+) {
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "TIME • Firebase Config Missing",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "This APK build does not contain app/google-services.json. Download the APK directly from AI Studio (Settings -> Generate APK) or include google-services.json in your repository before building.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(onClick = onOpenGuide) {
+                    Text("Open Firebase Setup Guide (हिन्दी)")
+                }
+            }
+        }
     }
 }
 

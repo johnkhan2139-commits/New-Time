@@ -181,4 +181,12 @@ class ExampleRobolectricTest {
         assertEquals(2, messages.size)
         assertEquals("Group call at 8 PM?", messages.last().body)
     }
+
+    @Test
+    fun `main activity cold starts cleanly without crashing`() {
+        val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        assertNotNull(activity)
+        controller.pause().stop().destroy()
+    }
 }

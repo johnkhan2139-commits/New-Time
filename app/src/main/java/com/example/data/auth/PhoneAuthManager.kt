@@ -27,7 +27,7 @@ sealed interface PhoneAuthState {
  * Requires Phone Authentication + Play Integrity API enabled in Firebase Console.
  */
 class PhoneAuthManager(
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth? = runCatching { FirebaseAuth.getInstance() }.getOrNull()
 ) {
     private val _state = MutableStateFlow<PhoneAuthState>(PhoneAuthState.Idle)
     val state: StateFlow<PhoneAuthState> = _state.asStateFlow()
@@ -40,6 +40,11 @@ class PhoneAuthManager(
         rawPhoneNumber: String,
         isResend: Boolean = false
     ) {
+        val firebaseAuth = auth
+        if (firebaseAuth == null) {
+            _state.value = PhoneAuthState.Error("Firebase is not configured in this APK build (missing google-services.json).")
+            return
+        }
         val formatted = rawPhoneNumber.trim().replace(" ", "")
         if (!formatted.startsWith("+") || formatted.length < 10) {
             _state.value = PhoneAuthState.Error("Enter phone number with country code (e.g. +919876543210).")
@@ -73,7 +78,7 @@ class PhoneAuthManager(
             }
         }
 
-        val builder = PhoneAuthOptions.newBuilder(auth)
+        val builder = PhoneAuthOptions.newBuilder(firebaseAuth)
             .setPhoneNumber(formatted)
             .setTimeout(60L, TimeUnit.SECONDS)
             .setActivity(activity)
@@ -87,6 +92,12 @@ class PhoneAuthManager(
     }
 
     suspend fun verifyOtpCode(verificationId: String, smsCode: String): Result<Unit> {
+        val firebaseAuth = auth
+        if (firebaseAuth == null) {
+            val msg = "Firebase is not configured in this APK build."
+            _state.value = PhoneAuthState.Error(msg)
+            return Result.failure(IllegalStateException(msg))
+        }
         val code = smsCode.trim()
         if (code.length < 6) {
             val msg = "Enter the 6-digit OTP code."
@@ -96,7 +107,7 @@ class PhoneAuthManager(
         _state.value = PhoneAuthState.Verifying
         return try {
             val credential = PhoneAuthProvider.getCredential(verificationId, code)
-            auth.signInWithCredential(credential).await()
+            firebaseAuth.signInWithCredential(credential).await()
             _state.value = PhoneAuthState.Verified
             Result.success(Unit)
         } catch (e: Exception) {
@@ -108,8 +119,9 @@ class PhoneAuthManager(
     }
 
     private fun signInWithPhoneCredential(credential: PhoneAuthCredential) {
+        val firebaseAuth = auth ?: return
         _state.value = PhoneAuthState.Verifying
-        auth.signInWithCredential(credential)
+        firebaseAuth.signInWithCredential(credential)
             .addOnSuccessListener {
                 _state.value = PhoneAuthState.Verified
             }

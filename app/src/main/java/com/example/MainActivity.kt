@@ -15,7 +15,7 @@ import com.google.firebase.FirebaseApp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        FirebaseApp.initializeApp(this)
+        runCatching { FirebaseApp.initializeApp(this) }
         enableEdgeToEdge()
         setContent {
             val preferences = remember { TimePreferences(applicationContext) }
