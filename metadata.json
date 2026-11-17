@@ -1,0 +1,6 @@
+{
+  "name": "TIME",
+  "description": "Public online messaging, media sharing, and video calling Android app with Firebase and safety moderation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
