@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "UserDirectoryProfile": {
+      "title": "UserDirectoryProfile",
+      "description": "Public user profile in the TIME online directory (PII isolated in private subcollection).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string" },
+        "handle": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatarBase64": { "type": "string" },
+        "devicePlatform": { "type": "string", "enum": ["ANDROID", "IPHONE"] },
+        "online": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "handle", "online", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Owner-only private contact info and block list.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "blockedUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "blockedUids", "createdAt", "updatedAt"]
+    },
+    "OnlineChat": {
+      "title": "OnlineChat",
+      "description": "1-to-1 DM or multi-member group chat document.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "groupChat": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "memberNames": { "type": "array" },
+        "lastMessagePreview": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "groupChat", "createdBy", "memberUids", "memberNames", "lastMessagePreview", "lastMessageAt", "createdAt", "updatedAt"]
+    },
+    "OnlineMessage": {
+      "title": "OnlineMessage",
+      "description": "Real-time text or compressed media message inside a chat.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "body": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["TEXT", "IMAGE", "VIDEO"] },
+        "mediaBase64": { "type": "string" },
+        "mediaNote": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "senderId", "senderName", "body", "mediaType", "memberUids", "createdAt"]
+    },
+    "CallSession": {
+      "title": "CallSession",
+      "description": "WebRTC audio or video call signaling session.",
+      "type": "object",
+      "properties": {
+        "callerId": { "type": "string" },
+        "callerName": { "type": "string" },
+        "calleeId": { "type": "string" },
+        "calleeName": { "type": "string" },
+        "chatId": { "type": "string" },
+        "callType": { "type": "string", "enum": ["AUDIO", "VIDEO"] },
+        "status": { "type": "string", "enum": ["RINGING", "ACTIVE", "DECLINED", "ENDED"] },
+        "offerSdp": { "type": "string" },
+        "answerSdp": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["callerId", "callerName", "calleeId", "calleeName", "callType", "status", "participantUids", "createdAt", "updatedAt"]
+    },
+    "IceCandidateDoc": {
+      "title": "IceCandidateDoc",
+      "description": "WebRTC ICE candidate exchanged during call setup.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "sdpMid": { "type": "string" },
+        "sdpMLineIndex": { "type": "integer" },
+        "candidate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "participantUids", "sdpMid", "sdpMLineIndex", "candidate", "createdAt"]
+    },
+    "SafetyReport": {
+      "title": "SafetyReport",
+      "description": "Abuse or safety moderation report.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "targetUserId": { "type": "string" },
+        "targetName": { "type": "string" },
+        "category": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "REVIEWED", "RESOLVED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetUserId", "targetName", "category", "details", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserDirectoryProfile" },
+      "description": "Public TIME user directory profiles"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Owner-only private PII and block list"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/OnlineChat" },
+      "description": "1-to-1 and group chats"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/OnlineMessage" },
+      "description": "Chat messages with denormalized memberUids"
+    },
+    "/calls/{callId}": {
+      "schema": { "$ref": "#/entities/CallSession" },
+      "description": "WebRTC audio/video call signaling sessions"
+    },
+    "/calls/{callId}/candidates/{candidateId}": {
+      "schema": { "$ref": "#/entities/IceCandidateDoc" },
+      "description": "WebRTC ICE candidates for a call"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/SafetyReport" },
+      "description": "User safety & moderation reports"
+    }
+  }
+}

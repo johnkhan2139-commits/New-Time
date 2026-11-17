@@ -174,6 +174,49 @@ class TimeRepository(
         }
     }
 
+    suspend fun createGroupThread(groupName: String, membersRaw: String): Result<Long> {
+        return try {
+            val cleanGroupName = groupName.trim()
+            require(cleanGroupName.isNotEmpty()) { "Group name is required." }
+            val members = membersRaw.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            val membersCsv = members.joinToString(", ")
+            val preview = if (members.isEmpty()) {
+                "Group created (local)"
+            } else {
+                "Members: $membersCsv"
+            }
+            val now = System.currentTimeMillis()
+            val threadId = dao.insertThread(
+                ChatThreadEntity(
+                    contactName = cleanGroupName,
+                    contactHandle = "group",
+                    lastMessagePreview = preview,
+                    lastMessageAt = now,
+                    isGroup = true,
+                    membersCsv = membersCsv
+                )
+            )
+            dao.insertMessage(
+                ChatMessageEntity(
+                    threadId = threadId,
+                    senderName = "TIME",
+                    isOutgoing = false,
+                    body = "Group \"$cleanGroupName\" created locally${if (membersCsv.isNotEmpty()) " with $membersCsv" else ""}. Connect Firebase to sync group messages online.",
+                    mediaType = MediaAttachmentType.TEXT.name,
+                    createdAt = now
+                )
+            )
+            Result.success(threadId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun sendMessage(
         threadId: Long,
         senderName: String,

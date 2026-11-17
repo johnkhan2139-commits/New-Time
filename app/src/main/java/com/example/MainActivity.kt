@@ -5,21 +5,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.preferences.TimePreferences
 import com.example.ui.navigation.TimeAppShell
 import com.example.ui.theme.TimeTheme
-import com.example.ui.viewmodel.TimeViewModel
+import com.google.firebase.FirebaseApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FirebaseApp.initializeApp(this)
         enableEdgeToEdge()
         setContent {
-            val viewModel: TimeViewModel = viewModel()
-            val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+            val preferences = remember { TimePreferences(applicationContext) }
+            val isDarkTheme by preferences.isDarkTheme.collectAsStateWithLifecycle(initialValue = true)
             TimeTheme(darkTheme = isDarkTheme) {
-                TimeAppShell(viewModel = viewModel)
+                TimeAppShell(preferences = preferences)
             }
         }
     }

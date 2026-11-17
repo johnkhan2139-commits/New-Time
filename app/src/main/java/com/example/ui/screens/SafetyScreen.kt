@@ -49,17 +49,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.data.local.ChatThreadEntity
-import com.example.data.local.SafetyReportEntity
+import com.example.data.remote.OnlineSafetyReport
+import com.example.data.remote.UserDirectoryProfile
 import com.example.ui.components.formatFullDateTime
 
 @Composable
 fun SafetyScreen(
-    blockedThreads: List<ChatThreadEntity>,
-    safetyReports: List<SafetyReportEntity>,
-    onUnblockThread: (Long) -> Unit,
-    onSubmitReport: (targetName: String, handle: String, category: String, details: String) -> Unit,
-    onUpdateReportStatus: (reportId: Long, status: String) -> Unit,
+    isAdmin: Boolean,
+    blockedUsers: List<UserDirectoryProfile>,
+    safetyReports: List<OnlineSafetyReport>,
+    onUnblockUser: (String) -> Unit,
+    onSubmitReport: (targetUid: String, targetName: String, category: String, details: String) -> Unit,
+    onUpdateReportStatus: (reportId: String, status: String) -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenTerms: () -> Unit,
     modifier: Modifier = Modifier
@@ -104,7 +105,7 @@ fun SafetyScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Manage blocked contacts, moderation reports, notification permissions, and legal policies.",
+                text = "Cloud-enforced block list, Firestore safety moderation queue, notifications & policies.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -135,9 +136,9 @@ fun SafetyScreen(
                             )
                             Text(
                                 text = if (notificationsGranted) {
-                                    "Android OS permission granted (FCM server key still required for remote push)."
+                                    "OS permission granted. In-app real-time message & call alerts work via Firestore; background push requires FCM Cloud Functions."
                                 } else {
-                                    "Permission not granted yet. Required on Android 13+ for incoming message & call alerts."
+                                    "Permission not granted yet. Required on Android 13+ for call & message alerts."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -180,19 +181,19 @@ fun SafetyScreen(
                             tint = MaterialTheme.colorScheme.error
                         )
                         Text(
-                            text = "Blocked Users (${blockedThreads.size})",
+                            text = "Blocked Users (${blockedUsers.size})",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
 
-                    if (blockedThreads.isEmpty()) {
+                    if (blockedUsers.isEmpty()) {
                         Text(
-                            text = "No blocked conversations on this device.",
+                            text = "No blocked users.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        blockedThreads.forEach { thread ->
+                        blockedUsers.forEach { user ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(12.dp),
@@ -207,16 +208,16 @@ fun SafetyScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = thread.contactName,
+                                            text = user.displayName,
                                             style = MaterialTheme.typography.titleSmall
                                         )
                                         Text(
-                                            text = "@${thread.contactHandle}",
+                                            text = "@${user.handle}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    TextButton(onClick = { onUnblockThread(thread.id) }) {
+                                    TextButton(onClick = { onUnblockUser(user.userId) }) {
                                         Text("Unblock")
                                     }
                                 }
@@ -251,7 +252,7 @@ fun SafetyScreen(
                                 tint = MaterialTheme.colorScheme.secondary
                             )
                             Text(
-                                text = "Moderation Queue (${safetyReports.size})",
+                                text = "Safety Reports (${safetyReports.size})",
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -267,7 +268,7 @@ fun SafetyScreen(
 
                     if (safetyReports.isEmpty()) {
                         Text(
-                            text = "No safety reports submitted yet. Reports logged here are stored locally until synced to your Firebase moderation collection.",
+                            text = "No safety reports submitted yet. Reports are saved directly to Cloud Firestore moderation.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -306,21 +307,23 @@ fun SafetyScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        if (report.status != "REVIEWED") {
-                                            OutlinedButton(
-                                                onClick = { onUpdateReportStatus(report.id, "REVIEWED") },
-                                                modifier = Modifier.height(38.dp)
-                                            ) {
-                                                Text("Mark Reviewed", style = MaterialTheme.typography.labelSmall)
+                                    if (isAdmin) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            if (report.status != "REVIEWED") {
+                                                OutlinedButton(
+                                                    onClick = { onUpdateReportStatus(report.id, "REVIEWED") },
+                                                    modifier = Modifier.height(38.dp)
+                                                ) {
+                                                    Text("Mark Reviewed", style = MaterialTheme.typography.labelSmall)
+                                                }
                                             }
-                                        }
-                                        if (report.status != "RESOLVED") {
-                                            Button(
-                                                onClick = { onUpdateReportStatus(report.id, "RESOLVED") },
-                                                modifier = Modifier.height(38.dp)
-                                            ) {
-                                                Text("Resolve", style = MaterialTheme.typography.labelSmall)
+                                            if (report.status != "RESOLVED") {
+                                                Button(
+                                                    onClick = { onUpdateReportStatus(report.id, "RESOLVED") },
+                                                    modifier = Modifier.height(38.dp)
+                                                ) {
+                                                    Text("Resolve", style = MaterialTheme.typography.labelSmall)
+                                                }
                                             }
                                         }
                                     }
@@ -377,7 +380,7 @@ fun SafetyScreen(
             onDismiss = { showCreateReportDialog = false },
             onSubmit = { name, handle, category, details ->
                 showCreateReportDialog = false
-                onSubmitReport(name, handle, category, details)
+                onSubmitReport(handle.ifBlank { "manual_target" }, name, category, details)
             }
         )
     }
@@ -409,7 +412,7 @@ private fun StandaloneReportDialog(
                 OutlinedTextField(
                     value = targetHandle,
                     onValueChange = { targetHandle = it },
-                    label = { Text("Phone or Handle (Optional)") },
+                    label = { Text("User ID or Handle (Optional)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

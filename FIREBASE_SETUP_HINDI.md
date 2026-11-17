@@ -1,36 +1,25 @@
 # TIME – Firebase सेटअप और Android APK गाइड (हिन्दी)
 
-> **महत्वपूर्ण स्थिति नोट (Honest Status):**
-> - इस AI Studio बिल्ड सेशन में `TIME_App_Public_Fixed_v2.zip` प्रोजेक्ट उपलब्ध नहीं था और यह वातावरण केवल **Native Android (Kotlin + Jetpack Compose)** ऐप्स बिल्ड करता है (Flutter/Dart नहीं)।
-> - साथ ही, Firebase सेटअप प्रॉम्प्ट को अस्वीकार (Decline) किए जाने के कारण लाइव **Phone OTP Auth, Cloud Firestore Sync, Firebase Storage, FCM Push Notifications, App Check, और Remote WebRTC Signaling** अभी ऑफलाइन हैं।
-> - नीचे दिए गए चरणों का पालन करके आप अपने असली Firebase प्रोजेक्ट को जोड़ सकते हैं और Debug / Release APK बना सकते हैं।
+> **वर्तमान स्थिति (Honest Status):**
+> - **प्रोविज़न्ड व सक्रिय (Active):** Firebase प्रोजेक्ट (`gen-lang-client-0418089832`), **Google Sign-In (Credential Manager)**, **Cloud Firestore Database** (`ai-studio-android-time-96f54aac-a0c4-4798-a38b-c20dc1a3ccc5`), और **Zero-Trust Security Rules** ऐप में जुड़े और सेटअप हैं।
+> - **मैनुअल Firebase Console सेटअप आवश्यक:** लाइव **SMS Phone OTP (`PhoneAuthManager`)**, **बड़े वीडियो क्लिप के लिए Firebase Storage**, **बैकग्राउंड FCM Push Notifications**, और **प्रोडक्शन TURN सर्वर** के लिए आपको नीचे दिए गए चरण Firebase Console में चालू करने होंगे।
 
 ---
 
-## 1. Firebase प्रोजेक्ट सेटअप (हिन्दी में)
+## 1. Firebase Console सेटअप (हिन्दी में)
 
-1. **Firebase Console खोलें**: [https://console.firebase.google.com](https://console.firebase.google.com) पर जाएं और **Add project** पर क्लिक करें (नाम: `TIME`)।
-2. **Android ऐप रजिस्टर करें**:
-   - **Android package name**: `com.aistudio.timechat.kpwmxr`
-   - **App nickname**: `TIME`
-   - **Debug signing certificate SHA-1**: अपने कीस्टोर से निकालकर जोड़ें।
-3. **`google-services.json` जोड़ें**:
-   - डाउनलोड की गई फाइल को `app/google-services.json` में रखें।
-   - कभी भी नकली या placeholder क्रेडेंशियल इस्तेमाल न करें।
-4. **Phone Authentication चालू करें**:
-   - Firebase Console -> **Authentication** -> **Sign-in method** -> **Phone** को Enable करें।
-   - असली मोबाइल नंबर OTP के लिए **Play Integrity API** (Google Cloud Console) को सक्रिय करें।
-5. **Cloud Firestore और Security Rules**:
-   - **Firestore Database** बनाएं।
-   - कम से कम यह सुनिश्चित करें कि `request.auth != null` के बिना कोई भी यूज़र डेटा न पढ़/लिख सके और `users/{uid}`, `chats/{chatId}`, `calls/{callId}`, `reports/{reportId}` पर सख्त ownership नियम लागू हों।
-6. **Firebase Storage और Rules**:
-   - फोटो और वीडियो अपलोड के लिए **Storage** चालू करें और केवल authenticated यूज़र्स को सीमित साइज (जैसे 25 MB तक) की मीडिया फाइल अपलोड की अनुमति दें।
-7. **Firebase Cloud Messaging (FCM)**:
-   - चैट और इनकमिंग वीडियो कॉल नोटिफिकेशन के लिए **Cloud Messaging** सक्रिय करें। Android 13+ डिवाइस के लिए ऐप में `POST_NOTIFICATIONS` परमिशन पहले से जोड़ी गई है।
-8. **Firebase App Check**:
-   - **App Check** में अपने Android ऐप के लिए **Play Integrity** (रिलीज़) और **Debug provider** (टेस्टिंग) रजिस्टर करें।
-9. **WebRTC TURN सर्वर**:
-   - प्रोडक्शन वीडियो कॉलिंग (NAT/Firewall के पार) के लिए **coturn** या कोई TURN सेवा सेट करें और ऐप के **Call Studio -> Configure TURN** में अपना `turn:` URL, username और credential सेव करें।
+1. **Firebase Console खोलें**: [https://console.firebase.google.com](https://console.firebase.google.com) में प्रोजेक्ट `gen-lang-client-0418089832` चुनें।
+2. **Phone Authentication (मोबाइल OTP लॉगिन) चालू करें**:
+   - **Authentication -> Sign-in method -> Phone** को Enable करें।
+   - असली मोबाइल नंबर SMS OTP के लिए **Google Cloud Console** में **Play Integrity API** सक्रिय करें और अपना **SHA-1 / SHA-256** फिंगरप्रिंट ऐप सेटिंग्स में सुनिश्चित करें।
+3. **Firebase Storage (फुल वीडियो फ़ाइल अपलोड के लिए)**:
+   - अभी फोटो और वीडियो की थंबनेल-फ्रेम झलक Firestore से शेयर होती है। पूरे वीडियो डाउनलोड/स्ट्रीम के लिए Firebase Console में **Storage** चालू करें और `request.auth != null` आधारित Storage Rules लगाएं।
+4. **Firebase Cloud Messaging (FCM) Push**:
+   - जब दोनों यूज़र ऐप खोलते हैं तब Firestore रियल-टाइम सिंक से तुरंत मैसेज और कॉल रिंग आती है। बंद ऐप में बैकग्राउंड पुश नोटिफिकेशन के लिए FCM और Cloud Functions जोड़ें।
+5. **Firebase App Check**:
+   - **App Check** में अपने Android ऐप (`com.aistudio.timechat.kpwmxr`) के लिए **Play Integrity** (रिलीज़) और **Debug provider** रजिस्टर करें।
+6. **WebRTC TURN सर्वर**:
+   - अलग-अलग मोबाइल नेटवर्क पर वीडियो और ऑडियो कॉलिंग के लिए **coturn** या कोई TURN सेवा सेट करें और ऐप के **Call Studio -> Configure TURN** में अपना `turn:` URL, username और credential सेव करें।
 
 ---
 
@@ -44,12 +33,17 @@ gradle :app:assembleDebug
 
 ### Release APK बनाने के लिए:
 1. अपना upload keystore बनाएं (`keytool -genkey -v -keystore my-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`)।
-2. Environment variables सेट करें:
-   - `KEYSTORE_PATH`
-   - `STORE_PASSWORD`
-   - `KEY_PASSWORD`
+2. Environment variables सेट करें: `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD`।
 3. कमांड चलाएं:
 ```bash
 gradle :app:assembleRelease
 ```
 आउटपुट पाथ: `app/build/outputs/apk/release/app-release.apk`
+
+---
+
+## 3. iPhone (iOS) वर्ज़न के लिए निर्देश
+
+> यह AI Studio कंटेनर केवल **Android APK** बिल्ड और टेस्ट कर सकता है। **iPhone (.ipa)** ऐप बनाने के लिए **Mac + Xcode** और Apple Developer अकाउंट आवश्यक होता है।
+- रिपॉजिटरी के `ios-companion/` फ़ोल्डर में iPhone के लिए SwiftUI + Firebase + Firestore स्कीमा फाइलें (`TimeModels.swift`, `TimeAuthAndChatView.swift`, `README_IOS.md`) जोड़ दी गई हैं।
+- जब iPhone यूज़र लॉग-इन करेगा तो उसका `devicePlatform = "IPHONE"` Firestore में सेव होगा और Android व iPhone यूज़र एक ही Firebase प्रोजेक्ट (`gen-lang-client-0418089832`) के ज़रिए आपस में चैट और WebRTC कॉल कर पाएंगे।

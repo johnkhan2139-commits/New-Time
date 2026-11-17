@@ -279,7 +279,7 @@ fun VideoStudioScreen(
                         }
                     }
 
-                    // Signaling status pill (honest about Firebase requirement)
+                    // Signaling status pill
                     Surface(
                         color = Color.Black.copy(alpha = 0.72f),
                         shape = RoundedCornerShape(12.dp),
@@ -289,9 +289,9 @@ fun VideoStudioScreen(
                     ) {
                         Text(
                             text = if (hasCameraPermission) {
-                                "Local Camera Active • Remote Signaling Offline"
+                                "Camera Active • WebRTC Signaling Ready"
                             } else {
-                                "Remote Signaling Offline"
+                                "WebRTC Firestore Signaling Ready"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
@@ -447,7 +447,7 @@ fun VideoStudioScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "• Remote peer-to-peer WebRTC signaling requires Firestore + FCM + Google WebRTC/coturn setup.",
+                        text = "• Remote audio/video WebRTC signaling uses Cloud Firestore (/calls). Configure a TURN server above for reliable mobile-carrier NAT traversal.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

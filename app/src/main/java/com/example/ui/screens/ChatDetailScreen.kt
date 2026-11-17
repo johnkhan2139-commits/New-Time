@@ -1,8 +1,6 @@
 package com.example.ui.screens
 
 import android.net.Uri
-import android.widget.MediaController
-import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -37,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
@@ -73,29 +72,29 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.data.local.ChatMessageEntity
-import com.example.data.local.ChatThreadEntity
-import com.example.data.local.MediaAttachmentType
+import com.example.data.remote.OnlineChat
+import com.example.data.remote.OnlineMediaHelper
+import com.example.data.remote.OnlineMessage
 import com.example.ui.components.AvatarCircle
 import com.example.ui.components.formatClockTime
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(
-    thread: ChatThreadEntity?,
-    messages: List<ChatMessageEntity>,
+    currentUserId: String,
+    chat: OnlineChat?,
+    messages: List<OnlineMessage>,
     onBack: () -> Unit,
-    onSendMessage: (body: String, mediaUri: Uri?) -> Unit,
-    onDeleteMessage: (Long) -> Unit,
-    onBlockUser: () -> Unit,
-    onReportUser: (category: String, details: String) -> Unit,
-    onDeleteThread: () -> Unit,
-    onOpenVideoStudio: () -> Unit
+    onSendMessage: (chat: OnlineChat, body: String, mediaUri: Uri?) -> Unit,
+    onDeleteMessage: (messageId: String) -> Unit,
+    onBlockUser: (targetUid: String) -> Unit,
+    onReportUser: (targetUid: String, targetName: String, category: String, details: String) -> Unit,
+    onDeleteChat: () -> Unit,
+    onStartAudioCall: (peerUid: String, peerName: String) -> Unit,
+    onStartVideoCall: (peerUid: String, peerName: String) -> Unit
 ) {
     BackHandler(onBack = onBack)
 
@@ -103,7 +102,12 @@ fun ChatDetailScreen(
     var pendingMediaUri by remember { mutableStateOf<Uri?>(null) }
     var showMenu by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
-    var previewMedia by remember { mutableStateOf<ChatMessageEntity?>(null) }
+    var previewMessage by remember { mutableStateOf<OnlineMessage?>(null) }
+
+    val peerUid = remember(chat, currentUserId) {
+        chat?.memberUids?.firstOrNull { it != currentUserId }
+    }
+    val peerName = chat?.name ?: "Conversation"
 
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) {
@@ -145,34 +149,50 @@ fun ChatDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         AvatarCircle(
-                            name = thread?.contactName ?: "TIME",
-                            avatarPath = null,
+                            name = peerName,
                             size = 38.dp
                         )
                         Column {
                             Text(
-                                text = thread?.contactName ?: "Conversation",
+                                text = peerName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Local Room History",
+                                text = if (chat?.groupChat == true) {
+                                    "Group • ${chat.memberNames.joinToString(", ")}"
+                                } else {
+                                    "Cloud Firestore • Encrypted TLS"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1
                             )
                         }
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = onOpenVideoStudio,
-                        modifier = Modifier.testTag("chat_video_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.VideoCall,
-                            contentDescription = "Open Video Studio",
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
+                    if (chat != null && !chat.groupChat && peerUid != null) {
+                        IconButton(
+                            onClick = { onStartAudioCall(peerUid, peerName) },
+                            modifier = Modifier.testTag("chat_audio_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Call,
+                                contentDescription = "Start Audio Call",
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        IconButton(
+                            onClick = { onStartVideoCall(peerUid, peerName) },
+                            modifier = Modifier.testTag("chat_video_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.VideoCall,
+                                contentDescription = "Start Video Call",
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
                     }
                     Box {
                         IconButton(
@@ -185,31 +205,35 @@ fun ChatDetailScreen(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Block User") },
-                                leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null) },
-                                onClick = {
-                                    showMenu = false
-                                    onBlockUser()
-                                    onBack()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Report User") },
-                                leadingIcon = { Icon(Icons.Filled.Report, contentDescription = null) },
-                                onClick = {
-                                    showMenu = false
-                                    showReportDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete Conversation") },
-                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                                onClick = {
-                                    showMenu = false
-                                    onDeleteThread()
-                                }
-                            )
+                            if (peerUid != null && chat?.groupChat == false) {
+                                DropdownMenuItem(
+                                    text = { Text("Block User") },
+                                    leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        onBlockUser(peerUid)
+                                        onBack()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Report User") },
+                                    leadingIcon = { Icon(Icons.Filled.Report, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        showReportDialog = true
+                                    }
+                                )
+                            }
+                            if (chat?.createdBy == currentUserId) {
+                                DropdownMenuItem(
+                                    text = { Text("Delete Conversation") },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        onDeleteChat()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -232,9 +256,12 @@ fun ChatDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(messages, key = { it.id }) { msg ->
-                    MessageBubble(
+                    val isMine = msg.senderId == currentUserId
+                    OnlineMessageBubble(
                         message = msg,
-                        onMediaClick = { previewMedia = msg },
+                        isMine = isMine,
+                        showSenderName = chat?.groupChat == true && !isMine,
+                        onMediaClick = { previewMessage = msg },
                         onDelete = { onDeleteMessage(msg.id) }
                     )
                 }
@@ -254,7 +281,7 @@ fun ChatDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Media attachment ready to send",
+                            text = "Photo / Video frame ready to send",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -308,22 +335,21 @@ fun ChatDetailScreen(
                             .testTag("message_composer_input")
                     )
 
+                    val canSend = chat != null && (messageText.isNotBlank() || pendingMediaUri != null)
                     IconButton(
                         onClick = {
-                            onSendMessage(messageText, pendingMediaUri)
+                            val currentChat = chat ?: return@IconButton
+                            onSendMessage(currentChat, messageText, pendingMediaUri)
                             messageText = ""
                             pendingMediaUri = null
                         },
-                        enabled = messageText.isNotBlank() || pendingMediaUri != null,
+                        enabled = canSend,
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(
-                                if (messageText.isNotBlank() || pendingMediaUri != null) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                }
+                                if (canSend) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant
                             )
                             .testTag("send_message_button")
                     ) {
@@ -338,41 +364,46 @@ fun ChatDetailScreen(
         }
     }
 
-    if (showReportDialog && thread != null) {
+    if (showReportDialog && chat != null) {
         ReportUserDialog(
-            targetName = thread.contactName,
+            targetName = peerName,
             onDismiss = { showReportDialog = false },
             onSubmit = { category, details ->
                 showReportDialog = false
-                onReportUser(category, details)
+                onReportUser(peerUid ?: chat.id, peerName, category, details)
             }
         )
     }
 
-    previewMedia?.let { msg ->
-        MediaPreviewDialog(
+    previewMessage?.let { msg ->
+        OnlineMediaPreviewDialog(
             message = msg,
-            onDismiss = { previewMedia = null }
+            onDismiss = { previewMessage = null }
         )
     }
 }
 
 @Composable
-private fun MessageBubble(
-    message: ChatMessageEntity,
+private fun OnlineMessageBubble(
+    message: OnlineMessage,
+    isMine: Boolean,
+    showSenderName: Boolean,
     onMediaClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val alignment = if (message.isOutgoing) Alignment.CenterEnd else Alignment.CenterStart
-    val bubbleColor = if (message.isOutgoing) {
+    val alignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart
+    val bubbleColor = if (isMine) {
         MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
-    val textColor = if (message.isOutgoing) {
+    val textColor = if (isMine) {
         MaterialTheme.colorScheme.onPrimary
     } else {
         MaterialTheme.colorScheme.onSurface
+    }
+    val mediaBytes = remember(message.mediaBase64) {
+        OnlineMediaHelper.decodeBase64Bytes(message.mediaBase64)
     }
 
     Box(
@@ -387,54 +418,51 @@ private fun MessageBubble(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (!message.mediaPath.isNullOrBlank()) {
-                val file = File(message.mediaPath)
-                if (file.exists()) {
-                    if (message.mediaType == MediaAttachmentType.VIDEO.name) {
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(12.dp),
+            if (showSenderName) {
+                Text(
+                    text = message.senderName,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            if (mediaBytes != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onMediaClick)
+                ) {
+                    AsyncImage(
+                        model = mediaBytes,
+                        contentDescription = if (message.mediaType == "VIDEO") "Video preview" else "Photo attachment",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (message.mediaType == "VIDEO") {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(onClick = onMediaClick)
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.35f)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.PlayCircle,
-                                    contentDescription = "Play video",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(34.dp)
-                                )
-                                Column {
-                                    Text(
-                                        text = "Video Attachment",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = "Tap to preview playback",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.White.copy(alpha = 0.8f)
-                                    )
-                                }
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.PlayCircle,
+                                contentDescription = "Video thumbnail",
+                                tint = Color.White,
+                                modifier = Modifier.size(44.dp)
+                            )
                         }
-                    } else {
-                        AsyncImage(
-                            model = file,
-                            contentDescription = "Image attachment",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(onClick = onMediaClick),
-                            contentScale = ContentScale.Crop
-                        )
                     }
+                }
+                if (!message.mediaNote.isNullOrBlank() && message.mediaType == "VIDEO") {
+                    Text(
+                        text = message.mediaNote,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textColor.copy(alpha = 0.85f)
+                    )
                 }
             }
 
@@ -456,26 +484,28 @@ private fun MessageBubble(
                     style = MaterialTheme.typography.labelSmall,
                     color = textColor.copy(alpha = 0.75f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "Delete message",
-                    tint = textColor.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clickable(onClick = onDelete)
-                )
+                if (isMine) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete message",
+                        tint = textColor.copy(alpha = 0.65f),
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable(onClick = onDelete)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MediaPreviewDialog(
-    message: ChatMessageEntity,
+private fun OnlineMediaPreviewDialog(
+    message: OnlineMessage,
     onDismiss: () -> Unit
 ) {
-    val filePath = message.mediaPath ?: return
+    val bytes = remember(message.mediaBase64) { OnlineMediaHelper.decodeBase64Bytes(message.mediaBase64) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -486,32 +516,32 @@ private fun MediaPreviewDialog(
                 .background(Color.Black)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
-            if (message.mediaType == MediaAttachmentType.VIDEO.name) {
-                AndroidView(
-                    factory = { ctx ->
-                        VideoView(ctx).apply {
-                            setVideoPath(filePath)
-                            val controller = MediaController(ctx)
-                            controller.setAnchorView(this)
-                            setMediaController(controller)
-                            start()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Center)
-                )
-            } else {
+            if (bytes != null) {
                 AsyncImage(
-                    model = File(filePath),
-                    contentDescription = "Full screen image preview",
+                    model = bytes,
+                    contentDescription = "Media preview",
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
             }
-
+            if (!message.mediaNote.isNullOrBlank()) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = message.mediaNote,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+            }
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier

@@ -19,6 +19,7 @@ val SoftWhite = Color(0xFFE2E8F0)
 val MutedSlate = Color(0xFF94A3B8)
 
 val SuccessEmerald = Color(0xFF10B981)
+val OnlineGreen = SuccessEmerald
 val WarningAmber = Color(0xFFF59E0B)
 val ErrorCoral = Color(0xFFEF4444)
 

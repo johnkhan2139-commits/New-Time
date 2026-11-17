@@ -28,7 +28,9 @@ data class ChatThreadEntity(
     val lastMessagePreview: String = "",
     val lastMessageAt: Long = System.currentTimeMillis(),
     val isBlocked: Boolean = false,
-    val isSelfNote: Boolean = false
+    val isSelfNote: Boolean = false,
+    val isGroup: Boolean = false,
+    val membersCsv: String = ""
 )
 
 enum class MediaAttachmentType {

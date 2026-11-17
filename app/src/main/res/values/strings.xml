@@ -1,14 +1,14 @@
 <resources>
     <string name="app_name">TIME</string>
-    <string name="tagline">Secure Messaging &amp; Video Studio</string>
-    <string name="cloud_status_offline">Cloud Sync Offline • Firebase Console Setup Required</string>
+    <string name="tagline">Online Messaging &amp; WebRTC Calling</string>
+    <string name="cloud_status_online">TIME Cloud Sync &amp; WebRTC Active</string>
     <string name="nav_chats">Chats</string>
     <string name="nav_video">Call Studio</string>
     <string name="nav_safety">Safety</string>
     <string name="nav_profile">Profile</string>
-    <string name="action_sign_in">Create Local Profile</string>
+    <string name="action_sign_in">Sign In</string>
     <string name="action_sign_out">Sign Out</string>
-    <string name="action_delete_account">Delete Account &amp; Data</string>
+    <string name="action_delete_account">Delete Account &amp; Cloud Data</string>
     <string name="privacy_policy_title">Privacy Policy</string>
     <string name="terms_title">Terms &amp; Conditions</string>
     <string name="firebase_guide_title">Firebase &amp; APK Setup (हिन्दी)</string>

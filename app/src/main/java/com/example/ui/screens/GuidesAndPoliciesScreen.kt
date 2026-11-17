@@ -42,16 +42,16 @@ fun PolicyScreen(
     val sections = if (isTerms) {
         listOf(
             "1. Acceptable Use" to "TIME is designed for respectful communication. Harassment, hate speech, impersonation, spam, and sharing non-consensual or unlawful media are strictly prohibited.",
-            "2. Safety & Moderation" to "Users may block contacts and submit safety reports at any time. Once connected to a Firebase backend, moderation actions apply across your public directory and chat rooms.",
-            "3. Permissions & Hardware" to "Camera and microphone permissions are used solely for live video call preview and WebRTC sessions. Media selection uses Android's zero-permission Photo Picker.",
-            "4. Account & Data Deletion" to "You can sign out or delete all locally stored profile, message, and media records at any time from Profile -> Delete Account & Local Data."
+            "2. Safety & Moderation" to "Users may block contacts and submit safety reports at any time. Reports are stored in Cloud Firestore and reviewed by moderation administrators.",
+            "3. Permissions & Hardware" to "Camera and microphone permissions are used solely for live WebRTC video/audio calling and Video Call Studio. Media selection uses Android's zero-permission Photo Picker.",
+            "4. Account & Data Deletion" to "You can sign out or delete your TIME cloud directory profile, private block/phone document, and authentication account from Profile -> Delete Account & Cloud Profile."
         )
     } else {
         listOf(
-            "1. Local-First Data Storage" to "Because Firebase provisioning was declined during setup, all profile details, chat threads, attachments, and safety reports are stored strictly on your device inside TIME's private Room database and files directory.",
-            "2. Zero Broad Storage Permissions" to "TIME does not request READ_EXTERNAL_STORAGE, READ_MEDIA_IMAGES, or READ_MEDIA_VIDEO. You explicitly choose photos or videos via the system Android Photo Picker.",
-            "3. Camera, Microphone & Notifications" to "CAMERA and RECORD_AUDIO permissions are requested only when using Video Call Studio. POST_NOTIFICATIONS is requested on Android 13+ only when enabled by the user.",
-            "4. Cloud & Firebase Integration" to "When you later attach your own Firebase project (google-services.json), Phone OTP Auth, Firestore, Cloud Storage, FCM, and App Check will operate under your Firebase project's security rules."
+            "1. Cloud Firestore & Private Split" to "Public directory profiles (display name, handle, bio, online status) are stored in Cloud Firestore (/users/{uid}). Sensitive info such as phone numbers and blocked UIDs is isolated in a strictly owner-only private subcollection (/users/{uid}/private/info).",
+            "2. Zero Broad Storage Permissions" to "TIME does not request READ_EXTERNAL_STORAGE, READ_MEDIA_IMAGES, or READ_MEDIA_VIDEO. Photos and video frames are picked safely using Android Photo Picker.",
+            "3. Camera, Microphone & Notifications" to "CAMERA and RECORD_AUDIO permissions are requested only when using WebRTC calls or Video Call Studio. POST_NOTIFICATIONS is requested on Android 13+ only when enabled by the user.",
+            "4. Authentication Security" to "TIME authenticates users via Firebase Auth (Google Sign-In via Jetpack Credential Manager and PhoneAuthManager OTP once Phone Auth + Play Integrity are enabled in Firebase Console)."
         )
     }
 
@@ -114,22 +114,22 @@ fun FirebaseGuideScreen(
     BackHandler(onBack = onBack)
 
     val steps = listOf(
-        "1. Firebase प्रोजेक्ट बनाएं (Create Project)" to
-            "Firebase Console (console.firebase.google.com) पर जाएं -> 'Add Project' पर क्लिक करें -> नाम 'TIME' रखें -> Android ऐप रजिस्टर करें (Package ID: com.aistudio.timechat.kpwmxr) और अपना SHA-1 / SHA-256 फिंगरप्रिंट जोड़ें।",
-        "2. google-services.json डाउनलोड करें" to
-            "डाउनलोड की गई google-services.json फाइल को प्रोजेक्ट के app/ फोल्डर (app/google-services.json) में रखें। कभी भी नकली या placeholder क्रेडेंशियल इस्तेमाल न करें।",
-        "3. Phone Authentication (मोबाइल OTP लॉगिन)" to
-            "Firebase Console -> Authentication -> Sign-in method -> 'Phone' को Enable करें। प्रोडक्शन SMS OTP के लिए Play Integrity API / App Check को सक्रिय करें।",
-        "4. Cloud Firestore & Security Rules" to
-            "Firestore Database बनाएं और नियम (Rules) सेट करें ताकि केवल लॉग-इन यूज़र (request.auth != null) ही अपने चैट रूम, प्रोफाइल और सुरक्षा रिपोर्ट पढ़/लिख सकें।",
-        "5. Firebase Storage & Rules" to
-            "फोटो और वीडियो शेयरिंग के लिए Firebase Storage चालू करें और साइज व Auth आधारित Storage Rules लागू करें।",
-        "6. Firebase Cloud Messaging (FCM) & App Check" to
-            "चैट और इनकमिंग कॉल नोटिफिकेशन के लिए Cloud Messaging चालू करें। Play Integrity के साथ Firebase App Check रजिस्टर करें।",
-        "7. WebRTC + TURN सर्वर सेटअप" to
-            "रिलायबल वीडियो कॉलिंग के लिए coturn या Metered/Twilio TURN सर्वर तैयार करें और Video Call Studio -> Configure TURN में अपना turn: URL, username और credential सेव करें।",
-        "8. Android APK बिल्ड निर्देश (Build Commands)" to
-            "Debug APK के लिए: gradle :app:assembleDebug\nRelease APK के लिए: कीस्टोर env वेरिएबल्स (KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD) सेट करके gradle :app:assembleRelease चलाएं।"
+        "1. सक्रिय सेवाएं (Already Provisioned)" to
+            "Firebase Project (gen-lang-client-0418089832), Google Sign-In (Credential Manager), Cloud Firestore Database (ai-studio-android-time-96f54aac-a0c4-4798-a38b-c20dc1a3ccc5), और Zero-Trust Security Rules पहले ही सेट और कॉन्फ़िगर किए जा चुके हैं।",
+        "2. Phone OTP Authentication चालू करें" to
+            "PhoneAuthManager कोड ऐप में शामिल है। लाइव SMS OTP के लिए Firebase Console -> Authentication -> Sign-in method -> 'Phone' को Enable करें और Google Cloud Console में Play Integrity API चालू करें।",
+        "3. Firebase Storage (बड़े वीडियो क्लिप के लिए)" to
+            "अभी फोटो और वीडियो थंबनेल-फ्रेम Firestore के जरिए सिंक होते हैं। बड़े फुल-वीडियो अपलोड के लिए Firebase Console में Storage चालू करें।",
+        "4. FCM Push Notifications (बैकग्राउंड अलर्ट)" to
+            "ऐप खुले होने पर चैट और कॉल अलर्ट Firestore से तुरंत आते हैं। ऐप बंद होने पर बैकग्राउंड पुश नोटिफिकेशन के लिए Firebase Cloud Messaging + Cloud Functions सेट करें।",
+        "5. Firebase App Check" to
+            "प्रोडक्शन सुरक्षा के लिए Firebase Console -> App Check में अपने Android ऐप (com.aistudio.timechat.kpwmxr) के साथ Play Integrity रजिस्टर करें।",
+        "6. WebRTC + TURN सर्वर सेटअप" to
+            "अलग-अलग मोबाइल नेटवर्क पर रिलायबल वीडियो/ऑडियो कॉलिंग के लिए coturn या Metered TURN सर्वर तैयार करें और Video Call Studio -> Configure TURN में अपना turn: URL, username और credential सेव करें।",
+        "7. Android APK बिल्ड निर्देश (Build Commands)" to
+            "Debug APK के लिए: gradle :app:assembleDebug\nRelease APK के लिए: KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD सेट करके gradle :app:assembleRelease चलाएं (या GitHub Actions Release APK वर्कफ़्लो से डाउनलोड करें)।",
+        "8. iPhone (iOS) वर्ज़न कैसे बिल्ड करें (Xcode / macOS)" to
+            "यह Android बिल्ड सर्वर केवल Android APK बना सकता है, iOS (.ipa) नहीं। हालांकि रिपॉजिटरी के /ios-companion/ फ़ोल्डर में iPhone के लिए SwiftUI + Firebase + WebRTC (devicePlatform = 'IPHONE') सोर्स कोड दे दिया गया है। Mac पर Xcode में प्रोजेक्ट खोलें, GoogleService-Info.plist (प्रोजेक्ट: gen-lang-client-0418089832) जोड़ें और App Store / TestFlight पर चलाएं — Android और iPhone यूज़र एक साथ चैट और कॉल कर सकेंगे।"
     )
 
     Scaffold(

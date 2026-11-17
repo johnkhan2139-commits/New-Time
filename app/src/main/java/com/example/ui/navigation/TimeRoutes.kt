@@ -6,7 +6,10 @@ import kotlinx.serialization.Serializable
 data object ChatsRoute
 
 @Serializable
-data class ChatDetailRoute(val threadId: Long)
+data class ChatDetailRoute(val chatId: String)
+
+@Serializable
+data class ActiveCallRoute(val callId: String)
 
 @Serializable
 data object VideoStudioRoute
