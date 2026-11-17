@@ -27,8 +27,11 @@ sealed interface PhoneAuthState {
  * Requires Phone Authentication + Play Integrity API enabled in Firebase Console.
  */
 class PhoneAuthManager(
-    private val auth: FirebaseAuth? = runCatching { FirebaseAuth.getInstance() }.getOrNull()
+    private val providedAuth: FirebaseAuth? = null
 ) {
+    private val auth: FirebaseAuth?
+        get() = providedAuth ?: runCatching { FirebaseAuth.getInstance() }.getOrNull()
+
     private val _state = MutableStateFlow<PhoneAuthState>(PhoneAuthState.Idle)
     val state: StateFlow<PhoneAuthState> = _state.asStateFlow()
 
@@ -42,7 +45,7 @@ class PhoneAuthManager(
     ) {
         val firebaseAuth = auth
         if (firebaseAuth == null) {
-            _state.value = PhoneAuthState.Error("Firebase is not configured in this APK build (missing google-services.json).")
+            _state.value = PhoneAuthState.Error("Firebase is not configured in this APK build.")
             return
         }
         val formatted = rawPhoneNumber.trim().replace(" ", "")

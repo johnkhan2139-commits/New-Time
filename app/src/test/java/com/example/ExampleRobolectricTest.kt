@@ -189,4 +189,48 @@ class ExampleRobolectricTest {
         assertNotNull(activity)
         controller.pause().stop().destroy()
     }
+
+    @Test
+    fun `runtime firebase config parses valid google services json accurately`() {
+        val sampleJson = """
+            {
+              "project_info": {
+                "project_number": "1234567890",
+                "project_id": "demo-time-project",
+                "storage_bucket": "demo-time-project.firebasestorage.app"
+              },
+              "client": [
+                {
+                  "client_info": {
+                    "mobilesdk_app_id": "1:1234567890:android:abcdef123456",
+                    "android_client_info": {
+                      "package_name": "com.aistudio.timechat.kpwmxr"
+                    }
+                  },
+                  "oauth_client": [
+                    {
+                      "client_id": "1234567890-webclient.apps.googleusercontent.com",
+                      "client_type": 3
+                    }
+                  ],
+                  "api_key": [
+                    {
+                      "current_key": "test-api-key-value"
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = com.example.data.remote.RuntimeFirebaseConfig.parseGoogleServicesJson(
+            rawJson = sampleJson,
+            targetPackageName = "com.aistudio.timechat.kpwmxr"
+        )
+        assertEquals("demo-time-project", parsed.projectId)
+        assertEquals("1:1234567890:android:abcdef123456", parsed.applicationId)
+        assertEquals("test-api-key-value", parsed.apiKey)
+        assertEquals("1234567890-webclient.apps.googleusercontent.com", parsed.webClientId)
+        assertEquals("1234567890", parsed.gcmSenderId)
+    }
 }

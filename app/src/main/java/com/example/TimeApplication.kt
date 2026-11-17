@@ -4,7 +4,7 @@ import android.app.Application
 import android.content.Intent
 import android.os.Process
 import android.util.Log
-import com.google.firebase.FirebaseApp
+import com.example.data.remote.RuntimeFirebaseConfig
 import java.io.PrintWriter
 import java.io.StringWriter
 import kotlin.system.exitProcess
@@ -14,7 +14,7 @@ class TimeApplication : Application() {
         super.onCreate()
         if (isCrashProcess()) return
 
-        runCatching { FirebaseApp.initializeApp(this) }
+        RuntimeFirebaseConfig.ensureInitialized(this)
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

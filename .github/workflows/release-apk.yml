@@ -59,6 +59,23 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Restore google-services.json from Secret (if missing)
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -f app/google-services.json ]; then
+            echo "app/google-services.json already present."
+          elif [ -n "$GS_JSON" ]; then
+            printf '%s' "$GS_JSON" > app/google-services.json
+            echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON secret."
+          elif [ -n "$GS_B64" ]; then
+            printf '%s' "$GS_B64" | base64 --decode > app/google-services.json
+            echo "Restored app/google-services.json from GOOGLE_SERVICES_JSON_BASE64 secret."
+          else
+            echo "::warning::app/google-services.json not found. Add GOOGLE_SERVICES_JSON secret in GitHub repo settings or import google-services.json in-app."
+          fi
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

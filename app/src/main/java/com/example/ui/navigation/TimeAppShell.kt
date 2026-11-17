@@ -1,5 +1,8 @@
 package com.example.ui.navigation
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,9 +12,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
@@ -34,10 +41,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +80,7 @@ import com.example.data.auth.GoogleAuthManager
 import com.example.data.preferences.TimePreferences
 import com.example.data.remote.OnlineMediaHelper
 import com.example.data.remote.OnlineRepository
+import com.example.data.remote.RuntimeFirebaseConfig
 import com.example.ui.components.AvatarCircle
 import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
@@ -84,7 +94,6 @@ import com.example.ui.screens.VideoStudioScreen
 import com.example.ui.theme.OnlineGreen
 import com.example.ui.viewmodel.OnlineViewModel
 import com.google.firebase.Firebase
-import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 
@@ -103,17 +112,18 @@ fun TimeAppShell(
     val context = LocalContext.current
     var showUnauthGuide by remember { mutableStateOf(false) }
 
-    val firebaseReady = remember(context) {
-        runCatching {
-            FirebaseApp.getApps(context).isNotEmpty() || FirebaseApp.initializeApp(context) != null
-        }.getOrDefault(false)
+    var firebaseReady by remember(context) {
+        mutableStateOf(RuntimeFirebaseConfig.ensureInitialized(context))
     }
 
     if (!firebaseReady) {
         if (showUnauthGuide) {
             FirebaseGuideScreen(onBack = { showUnauthGuide = false })
         } else {
-            FirebaseMissingConfigScreen(onOpenGuide = { showUnauthGuide = true })
+            FirebaseMissingConfigScreen(
+                onConfigured = { firebaseReady = true },
+                onOpenGuide = { showUnauthGuide = true }
+            )
         }
         return
     }
@@ -198,8 +208,26 @@ fun TimeAppShell(
 
 @Composable
 private fun FirebaseMissingConfigScreen(
+    onConfigured: () -> Unit,
     onOpenGuide: () -> Unit
 ) {
+    val context = LocalContext.current
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showPasteDialog by remember { mutableStateOf(false) }
+    var pastedJson by remember { mutableStateOf("") }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            RuntimeFirebaseConfig.importFromUri(context, uri)
+                .onSuccess { onConfigured() }
+                .onFailure { err ->
+                    errorMessage = err.localizedMessage ?: "Invalid google-services.json file."
+                }
+        }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
@@ -211,24 +239,98 @@ private fun FirebaseMissingConfigScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "TIME • Firebase Config Missing",
+                    text = "TIME • Firebase Setup Needed",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "This APK build does not contain app/google-services.json. Download the APK directly from AI Studio (Settings -> Generate APK) or include google-services.json in your repository before building.",
+                    text = "Is GitHub APK build me app/google-services.json include nahi hai (AI Studio Push to GitHub security ke liye API keys exclude karta hai).\n\n" +
+                        "Fix karne ke 2 aasaan tarike:\n" +
+                        "1. AI Studio me Settings → Generate APK se seedha APK download karein (usme config pehle se included hoti hai), YA\n" +
+                        "2. Niche apna google-services.json file select ya paste karein.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(onClick = onOpenGuide) {
+
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Button(
+                    onClick = { filePicker.launch(arrayOf("application/json", "*/*")) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("import_google_services_button")
+                ) {
+                    Text("Import google-services.json File")
+                }
+
+                OutlinedButton(
+                    onClick = { showPasteDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("paste_google_services_button")
+                ) {
+                    Text("Paste google-services.json Text")
+                }
+
+                TextButton(onClick = onOpenGuide) {
                     Text("Open Firebase Setup Guide (हिन्दी)")
                 }
             }
         }
+    }
+
+    if (showPasteDialog) {
+        AlertDialog(
+            onDismissRequest = { showPasteDialog = false },
+            title = { Text("Paste google-services.json") },
+            text = {
+                OutlinedTextField(
+                    value = pastedJson,
+                    onValueChange = { pastedJson = it },
+                    label = { Text("JSON content") },
+                    minLines = 5,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        RuntimeFirebaseConfig.importFromJson(context, pastedJson)
+                            .onSuccess {
+                                showPasteDialog = false
+                                onConfigured()
+                            }
+                            .onFailure { err ->
+                                errorMessage = err.localizedMessage ?: "Invalid JSON format."
+                                showPasteDialog = false
+                            }
+                    }
+                ) {
+                    Text("Activate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPasteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

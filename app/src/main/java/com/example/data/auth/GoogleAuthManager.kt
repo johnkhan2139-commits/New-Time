@@ -23,13 +23,13 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+import com.example.data.remote.RuntimeFirebaseConfig
+
 object GoogleAuthManager {
     private const val TAG = "Auth"
 
     private fun getWebClientId(context: Context): String? {
-        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-        if (resId == 0) return null
-        return runCatching { context.getString(resId) }.getOrNull()?.takeIf { it.isNotBlank() }
+        return RuntimeFirebaseConfig.getWebClientId(context)
     }
 
     fun attemptAutoSignIn(
