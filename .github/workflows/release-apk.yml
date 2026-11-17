@@ -59,22 +59,25 @@ jobs:
       - name: Run unit tests and build Debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
 
-      - name: Rename Debug APK
+      - name: Prepare Debug APK asset
         run: |
           mkdir -p release-assets
           cp app/build/outputs/apk/debug/app-debug.apk release-assets/TIME-debug.apk
 
-      - name: Build Signed Release APK (if keystore secret configured)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.STORE_PASSWORD != '' && secrets.KEY_PASSWORD != '' }}
+      - name: Build Signed Release APK (if keystore secrets are set)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
-          export KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
-          gradle :app:assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk release-assets/TIME-release.apk
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
+            export KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
+            gradle :app:assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk release-assets/TIME-release.apk
+          else
+            echo "Release keystore secrets not set; skipping signed Release APK."
+          fi
 
       - name: Upload APK Workflow Artifact
         uses: actions/upload-artifact@v4
@@ -84,11 +87,13 @@ jobs:
 
       - name: Determine Release Tag
         id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.release_tag }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
-            echo "name=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT_TAG" ]; then
+            echo "name=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
           else
             echo "name=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
@@ -99,9 +104,9 @@ jobs:
           tag_name: ${{ steps.tag.outputs.name }}
           name: "TIME ${{ steps.tag.outputs.name }}"
           body: |
-            Automated build for **TIME** Android App (`com.aistudio.timechat.kpwmxr`).
-            - `TIME-debug.apk`: Ready to install for testing.
-            - `TIME-release.apk`: Included automatically when `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` secrets are configured.
+            Automated build for TIME Android App (com.aistudio.timechat.kpwmxr).
+            - TIME-debug.apk: Ready to install for testing.
+            - TIME-release.apk: Built automatically when KEYSTORE_BASE64, STORE_PASSWORD, and KEY_PASSWORD secrets are configured.
           files: release-assets/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
