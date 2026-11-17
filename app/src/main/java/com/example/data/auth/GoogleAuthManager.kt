@@ -76,7 +76,8 @@ object GoogleAuthManager {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (t: Throwable) {
+                Log.w(TAG, "Auto sign-in skipped: ${t.message}")
                 onUnauthenticated()
             }
         }
