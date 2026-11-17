@@ -1,28 +1,21 @@
-name: Build TIME APK & Publish Release
+name: Build TIME APK
 
 on:
   push:
     branches:
       - main
       - master
-    tags:
-      - "v*"
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "Release tag (leave empty for auto v1.0.<run_number>)"
-        required: false
-        default: ""
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
@@ -37,7 +30,7 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Ensure CI debug keystore exists
+      - name: Create debug keystore
         run: |
           if [ ! -f debug.keystore ]; then
             keytool -genkeypair -v \
@@ -51,62 +44,25 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Set up Gradle 9.3.1
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
 
-      - name: Run unit tests and build Debug APK
+      - name: Build Debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
 
-      - name: Prepare Debug APK asset
-        run: |
-          mkdir -p release-assets
-          cp app/build/outputs/apk/debug/app-debug.apk release-assets/TIME-debug.apk
-
-      - name: Build Signed Release APK (if keystore secrets are set)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
-            export KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
-            gradle :app:assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk release-assets/TIME-release.apk
-          else
-            echo "Release keystore secrets not set; skipping signed Release APK."
-          fi
-
-      - name: Upload APK Workflow Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TIME-APK
-          path: release-assets/*.apk
+          name: TIME-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Determine Release Tag
-        id: tag
-        env:
-          INPUT_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          elif [ -n "$INPUT_TAG" ]; then
-            echo "name=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish GitHub Release
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: "TIME ${{ steps.tag.outputs.name }}"
-          body: |
-            Automated build for TIME Android App (com.aistudio.timechat.kpwmxr).
-            - TIME-debug.apk: Ready to install for testing.
-            - TIME-release.apk: Built automatically when KEYSTORE_BASE64, STORE_PASSWORD, and KEY_PASSWORD secrets are configured.
-          files: release-assets/*.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: TIME v1.0.${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
