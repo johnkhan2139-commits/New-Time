@@ -65,10 +65,22 @@ jobs:
           gradle-version: "9.3.1"
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace --console=plain -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8"
+        run: |
+          set -o pipefail
+          if ! gradle :app:assembleDebug --no-daemon --console=plain -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8" 2>&1 | tee /tmp/build.log; then
+            echo "=== ERROR SUMMARY ==="
+            grep -nE "^e: |FAILURE:|\* What went wrong:|Caused by:|Execution failed|Unresolved reference" /tmp/build.log | tail -n 30 || tail -n 40 /tmp/build.log
+            exit 1
+          fi
 
       - name: Run Unit Tests
-        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace --console=plain -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8"
+        run: |
+          set -o pipefail
+          if ! gradle :app:testDebugUnitTest --no-daemon --console=plain -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8" 2>&1 | tee /tmp/test.log; then
+            echo "=== TEST ERROR SUMMARY ==="
+            grep -nE "^e: |FAILURE:|\* What went wrong:|Caused by:|Execution failed" /tmp/test.log | tail -n 30 || tail -n 40 /tmp/test.log
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
