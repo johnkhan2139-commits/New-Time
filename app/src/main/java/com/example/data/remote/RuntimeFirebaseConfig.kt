@@ -3,8 +3,10 @@ package com.example.data.remote
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.example.R
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.google.firebase.firestore.FirebaseFirestore
 import org.json.JSONObject
 
 data class ParsedGoogleServices(
@@ -46,11 +48,25 @@ object RuntimeFirebaseConfig {
         return loadSavedConfig(context.applicationContext)?.webClientId?.takeIf { it.isNotBlank() }
     }
 
+    fun getFirestoreDatabase(context: Context): FirebaseFirestore {
+        val provisionedDbId = context.getString(R.string.firestore_database_id)
+        val activeProjectId = runCatching { FirebaseApp.getInstance().options.projectId }.getOrNull()
+        return if (activeProjectId == null || activeProjectId == PROVISIONED_PROJECT_ID) {
+            FirebaseFirestore.getInstance(provisionedDbId)
+        } else {
+            FirebaseFirestore.getInstance(FirebaseApp.getInstance())
+        }
+    }
+
     fun importFromUri(context: Context, uri: Uri): Result<Unit> {
         return try {
-            val rawJson = context.contentResolver.openInputStream(uri)?.use { stream ->
-                stream.bufferedReader().readText()
-            } ?: return Result.failure(IllegalStateException("Unable to read selected file."))
+            val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes()
+            } ?: return Result.failure(IllegalStateException("Unable to read selected file. Try downloading the file locally first."))
+            if (bytes.isEmpty()) {
+                return Result.failure(IllegalArgumentException("Selected file is empty."))
+            }
+            val rawJson = decodeUtfText(bytes)
             importFromJson(context, rawJson)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read google-services.json from Uri", e)
@@ -60,12 +76,7 @@ object RuntimeFirebaseConfig {
 
     fun importFromJson(context: Context, rawJson: String): Result<Unit> {
         return try {
-            val cleaned = rawJson
-                .trim()
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
+            val cleaned = sanitizeJsonInput(rawJson)
             val parsed = parseGoogleServicesJson(cleaned, context.packageName)
             val appContext = context.applicationContext
             saveConfig(appContext, parsed)
@@ -110,8 +121,35 @@ object RuntimeFirebaseConfig {
         }
     }
 
+    internal fun sanitizeJsonInput(raw: String): String {
+        val noBom = raw.replace("\uFEFF", "").trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+        val firstBrace = noBom.indexOf('{')
+        val lastBrace = noBom.lastIndexOf('}')
+        return if (firstBrace >= 0 && lastBrace > firstBrace) {
+            noBom.substring(firstBrace, lastBrace + 1)
+        } else {
+            noBom
+        }
+    }
+
+    private fun decodeUtfText(bytes: ByteArray): String {
+        if (bytes.size >= 2) {
+            if (bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte()) {
+                return String(bytes, Charsets.UTF_16LE)
+            }
+            if (bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte()) {
+                return String(bytes, Charsets.UTF_16BE)
+            }
+        }
+        return String(bytes, Charsets.UTF_8)
+    }
+
     internal fun parseGoogleServicesJson(rawJson: String, targetPackageName: String): ParsedGoogleServices {
-        val root = JSONObject(rawJson.trim())
+        val root = JSONObject(sanitizeJsonInput(rawJson))
         val projectInfo = root.optJSONObject("project_info")
             ?: throw IllegalArgumentException("Missing project_info in google-services.json")
         val projectId = projectInfo.optString("project_id").trim()
@@ -166,6 +204,20 @@ object RuntimeFirebaseConfig {
                 }
             }
         }
+        if (webClientId == null) {
+            val otherClients = client.optJSONObject("services")
+                ?.optJSONObject("appinvite_service")
+                ?.optJSONArray("other_platform_oauth_client")
+            if (otherClients != null) {
+                for (j in 0 until otherClients.length()) {
+                    val oauth = otherClients.optJSONObject(j) ?: continue
+                    if (oauth.optInt("client_type") == 3) {
+                        webClientId = oauth.optString("client_id").trim().takeIf { it.isNotEmpty() }
+                        break
+                    }
+                }
+            }
+        }
 
         return ParsedGoogleServices(
             projectId = projectId,
@@ -205,8 +257,10 @@ object RuntimeFirebaseConfig {
             .putString(KEY_STORAGE_BUCKET, config.storageBucket)
             .putString(KEY_GCM_SENDER_ID, config.gcmSenderId)
             .putString(KEY_WEB_CLIENT_ID, config.webClientId)
-            .apply()
+            .commit()
     }
+
+    private const val PROVISIONED_PROJECT_ID = "gen-lang-client-0418089832"
 
     private fun loadSavedConfig(context: Context): ParsedGoogleServices? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

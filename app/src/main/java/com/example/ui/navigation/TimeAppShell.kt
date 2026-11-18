@@ -101,6 +101,9 @@ import com.example.ui.viewmodel.OnlineViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class TopTab(
     val route: Any,
@@ -217,6 +220,8 @@ private fun FirebaseMissingConfigScreen(
     onOpenGuide: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showPasteDialog by remember { mutableStateOf(false) }
     var showManualDialog by remember { mutableStateOf(false) }
@@ -227,17 +232,30 @@ private fun FirebaseMissingConfigScreen(
     var manualApiKey by remember { mutableStateOf("") }
     var manualWebClientId by remember { mutableStateOf("") }
 
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            RuntimeFirebaseConfig.importFromUri(context, uri)
+    fun handleSelectedUri(uri: android.net.Uri?) {
+        if (uri == null) return
+        isImporting = true
+        errorMessage = null
+        scope.launch {
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                RuntimeFirebaseConfig.importFromUri(context, uri)
+            }
+            isImporting = false
+            result
                 .onSuccess { onConfigured() }
                 .onFailure { err ->
-                    errorMessage = err.localizedMessage ?: "Invalid google-services.json file."
+                    errorMessage = err.localizedMessage ?: "Selected file is not a valid google-services.json."
                 }
         }
     }
+
+    val openDocumentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri -> handleSelectedUri(uri) }
+
+    val getContentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> handleSelectedUri(uri) }
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing
@@ -292,17 +310,56 @@ private fun FirebaseMissingConfigScreen(
                 }
 
                 Button(
-                    onClick = { filePicker.launch(arrayOf("application/json", "*/*")) },
+                    onClick = {
+                        errorMessage = null
+                        runCatching {
+                            openDocumentPicker.launch(arrayOf("*/*"))
+                        }.onFailure {
+                            runCatching {
+                                getContentPicker.launch("*/*")
+                            }.onFailure { fallbackErr ->
+                                errorMessage = fallbackErr.localizedMessage ?: "No file manager available. Use Paste Text below."
+                            }
+                        }
+                    },
+                    enabled = !isImporting,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .testTag("import_google_services_button")
                 ) {
-                    Text("Import google-services.json File")
+                    if (isImporting) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.width(20.dp).height(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Importing google-services.json...")
+                    } else {
+                        Text("Import google-services.json File")
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        errorMessage = null
+                        runCatching { getContentPicker.launch("*/*") }.onFailure { err ->
+                            errorMessage = err.localizedMessage ?: "Unable to open alternate picker."
+                        }
+                    },
+                    enabled = !isImporting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("import_google_services_alt_button")
+                ) {
+                    Text("Choose File from Downloads / Folder")
                 }
 
                 OutlinedButton(
                     onClick = { showPasteDialog = true },
+                    enabled = !isImporting,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -313,6 +370,7 @@ private fun FirebaseMissingConfigScreen(
 
                 OutlinedButton(
                     onClick = { showManualDialog = true },
+                    enabled = !isImporting,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)

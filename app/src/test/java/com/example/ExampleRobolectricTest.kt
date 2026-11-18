@@ -244,4 +244,17 @@ class ExampleRobolectricTest {
         )
         assertTrue(missingKey.isFailure)
     }
+
+    @Test
+    fun `runtime firebase config strips bom and markdown fences cleanly`() {
+        val fenced = "\uFEFF```json\n{\"project_info\":{\"project_id\":\"p1\"},\"client\":[{\"client_info\":{\"mobilesdk_app_id\":\"1:1:android:1\"},\"api_key\":[{\"current_key\":\"k1\"}],\"services\":{\"appinvite_service\":{\"other_platform_oauth_client\":[{\"client_id\":\"web-123\",\"client_type\":3}]}}}]}\n```"
+        val parsed = com.example.data.remote.RuntimeFirebaseConfig.parseGoogleServicesJson(
+            rawJson = fenced,
+            targetPackageName = "com.aistudio.timechat.kpwmxr"
+        )
+        assertEquals("p1", parsed.projectId)
+        assertEquals("1:1:android:1", parsed.applicationId)
+        assertEquals("k1", parsed.apiKey)
+        assertEquals("web-123", parsed.webClientId)
+    }
 }

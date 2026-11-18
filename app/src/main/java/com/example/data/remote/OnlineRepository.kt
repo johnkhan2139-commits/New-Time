@@ -19,9 +19,7 @@ class OnlineRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
     constructor(context: Context) : this(
-        firestore = FirebaseFirestore.getInstance(
-            context.getString(R.string.firestore_database_id)
-        ),
+        firestore = RuntimeFirebaseConfig.getFirestoreDatabase(context),
         auth = FirebaseAuth.getInstance()
     )
 
