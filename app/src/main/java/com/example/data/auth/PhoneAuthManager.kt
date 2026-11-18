@@ -19,7 +19,10 @@ sealed interface PhoneAuthState {
     data class CodeSent(val verificationId: String, val phoneNumber: String) : PhoneAuthState
     data object Verifying : PhoneAuthState
     data object Verified : PhoneAuthState
-    data class Error(val message: String) : PhoneAuthState
+    data class Error(
+        val message: String,
+        val needsConsoleEnable: Boolean = false
+    ) : PhoneAuthState
 }
 
 /**
@@ -64,8 +67,24 @@ class PhoneAuthManager(
 
             override fun onVerificationFailed(e: FirebaseException) {
                 Log.e(TAG, "Phone verification failed", e)
+                val rawMsg = e.localizedMessage.orEmpty()
+                val providerDisabled = rawMsg.contains("not allowed", ignoreCase = true) ||
+                    rawMsg.contains("disabled", ignoreCase = true)
+                val authMismatch = rawMsg.contains("authorized", ignoreCase = true) ||
+                    rawMsg.contains("integrity", ignoreCase = true) ||
+                    rawMsg.contains("captcha", ignoreCase = true)
+
+                val friendlyMsg = when {
+                    providerDisabled ->
+                        "Firebase Console me Phone Sign-In abhi DISABLED hai. Firebase Console -> Authentication -> Sign-in method me 'Phone' Enable karein, ya Google Sign-In use karein."
+                    authMismatch ->
+                        "Is APK ka SHA-1/SHA-256 ya Play Integrity Firebase Console me registered nahi hai. AI Studio APK use karein ya Firebase Console me SHA-1 + Play Integrity add karein."
+                    else ->
+                        rawMsg.ifBlank { "OTP verification failed. Check Firebase Console Phone Auth setup." }
+                }
                 _state.value = PhoneAuthState.Error(
-                    e.localizedMessage ?: "OTP verification failed. Check Firebase Console Phone Auth setup."
+                    message = friendlyMsg,
+                    needsConsoleEnable = providerDisabled || authMismatch
                 )
             }
 
@@ -91,7 +110,15 @@ class PhoneAuthManager(
             builder.setForceResendingToken(resendToken!!)
         }
 
-        PhoneAuthProvider.verifyPhoneNumber(builder.build())
+        runCatching {
+            PhoneAuthProvider.verifyPhoneNumber(builder.build())
+        }.onFailure { err ->
+            Log.e(TAG, "verifyPhoneNumber threw synchronously", err)
+            _state.value = PhoneAuthState.Error(
+                message = err.localizedMessage ?: "Failed to start OTP verification.",
+                needsConsoleEnable = true
+            )
+        }
     }
 
     suspend fun verifyOtpCode(verificationId: String, smsCode: String): Result<Unit> {

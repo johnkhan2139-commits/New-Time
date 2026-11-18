@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,6 +72,7 @@ import com.example.data.auth.GoogleAuthManager
 import com.example.data.auth.PhoneAuthManager
 import com.example.data.auth.PhoneAuthState
 import com.example.ui.components.TimeBrandHeader
+import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.launch
 
 @Composable
@@ -374,6 +377,45 @@ fun AuthScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
+                                if (pState.needsConsoleEnable) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val projectId = runCatching {
+                                                FirebaseApp.getInstance().options.projectId
+                                            }.getOrNull()?.takeIf { !it.isNullOrBlank() }
+                                                ?: "gen-lang-client-0418089832"
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse("https://console.firebase.google.com/project/$projectId/authentication/providers")
+                                                    )
+                                                )
+                                            }.onFailure { err ->
+                                                authError = err.localizedMessage ?: "Unable to open browser."
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                            .testTag("open_phone_auth_console_button")
+                                    ) {
+                                        Text("Enable Phone Auth in Firebase Console")
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            selectedTab = 0
+                                            authError = null
+                                            phoneAuthManager.reset()
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                            .testTag("switch_to_google_signin_button")
+                                    ) {
+                                        Text("Use Google Sign-In (Active Now)")
+                                    }
+                                }
                                 Button(
                                     onClick = {
                                         if (activity != null) {
