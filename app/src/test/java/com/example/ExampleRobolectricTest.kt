@@ -257,4 +257,15 @@ class ExampleRobolectricTest {
         assertEquals("k1", parsed.apiKey)
         assertEquals("web-123", parsed.webClientId)
     }
+
+    @Test
+    fun `phone auth manager rejects malformed numbers and resets cleanly`() {
+        val activity = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val manager = com.example.data.auth.PhoneAuthManager()
+        manager.startPhoneNumberVerification(activity, "9876543210")
+        val state = manager.state.value
+        assertTrue(state is com.example.data.auth.PhoneAuthState.Error)
+        manager.reset()
+        assertTrue(manager.state.value is com.example.data.auth.PhoneAuthState.Idle)
+    }
 }

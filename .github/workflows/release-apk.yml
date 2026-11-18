@@ -45,18 +45,23 @@ jobs:
             echo "Warning: sdkmanager not found under $SDK_DIR/cmdline-tools"
           fi
 
-      - name: Create debug keystore
+      - name: Restore or create debug keystore
         run: |
           if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            if [ -f debug.keystore.base64 ]; then
+              base64 --decode debug.keystore.base64 > debug.keystore
+              echo "Restored debug.keystore from debug.keystore.base64 to match Firebase SHA-1."
+            else
+              keytool -genkeypair -v \
+                -keystore debug.keystore \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+            fi
           fi
 
       - name: Restore google-services.json from Secret (if missing)

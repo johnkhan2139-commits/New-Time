@@ -26,7 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Phone
@@ -36,7 +36,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,7 +47,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -87,12 +86,35 @@ fun AuthScreen(
     val phoneAuthManager = remember { PhoneAuthManager() }
     val phoneState by phoneAuthManager.state.collectAsStateWithLifecycle()
 
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Google, 1 = Mobile OTP
     var googleLoading by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
 
     var phoneInput by rememberSaveable { mutableStateOf("+91") }
     var otpCode by rememberSaveable { mutableStateOf("") }
+
+    fun launchGoogleGmailSignIn() {
+        if (googleLoading) return
+        googleLoading = true
+        authError = null
+        GoogleAuthManager.onGoogleSignInClicked(
+            context = context,
+            credentialManager = credentialManager,
+            onAuthSuccess = {
+                googleLoading = false
+                onAuthenticated()
+            },
+            onAuthError = { msg ->
+                googleLoading = false
+                authError = msg
+            },
+            onAuthCancelled = {
+                googleLoading = false
+                authError =
+                    "Gmail / Google Sign-In was cancelled. If no Google account popup appeared, verify a Gmail account is signed in on this phone and use the latest APK."
+            },
+            scope = scope
+        )
+    }
 
     LaunchedEffect(phoneState) {
         if (phoneState is PhoneAuthState.Verified) {
@@ -120,7 +142,7 @@ fun AuthScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(176.dp)
+                    .height(164.dp)
                     .clip(RoundedCornerShape(22.dp))
             ) {
                 Image(
@@ -153,41 +175,11 @@ fun AuthScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Public directory, 1-to-1 & group messaging, photos/videos & WebRTC calls.",
+                        text = "Sign in with Gmail (Google) or Mobile Number OTP to start chatting & video calling.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                FilterChip(
-                    selected = selectedTab == 0,
-                    onClick = {
-                        selectedTab = 0
-                        authError = null
-                    },
-                    label = { Text("Google Sign-In") },
-                    leadingIcon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("auth_tab_google")
-                )
-                FilterChip(
-                    selected = selectedTab == 1,
-                    onClick = {
-                        selectedTab = 1
-                        authError = null
-                    },
-                    label = { Text("Mobile OTP") },
-                    leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("auth_tab_phone_otp")
-                )
             }
 
             if (authError != null) {
@@ -205,251 +197,314 @@ fun AuthScreen(
                 }
             }
 
-            if (selectedTab == 0) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.fillMaxWidth()
+            // Card 1: Gmail / Google Sign-In
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("auth_gmail_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Sign in with Google",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Instant verified login provisioned with your TIME Cloud Firestore directory, groups, and WebRTC signaling.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Button(
-                            onClick = {
-                                if (googleLoading) return@Button
-                                googleLoading = true
-                                authError = null
-                                GoogleAuthManager.onGoogleSignInClicked(
-                                    context = context,
-                                    credentialManager = credentialManager,
-                                    onAuthSuccess = {
-                                        googleLoading = false
-                                        onAuthenticated()
-                                    },
-                                    onAuthError = { msg ->
-                                        googleLoading = false
-                                        authError = msg
-                                    },
-                                    onAuthCancelled = {
-                                        googleLoading = false
-                                    },
-                                    scope = scope
-                                )
-                            },
-                            enabled = !googleLoading,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .testTag("google_sign_in_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (googleLoading) {
-                                CircularProgressIndicator(
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Continue with Google")
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Email,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "Sign in with Gmail (Google)",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(999.dp)
+                        ) {
+                            Text(
+                                text = "Ready",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "1-tap verified login using your phone's Gmail / Google account with Cloud Firestore & WebRTC.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { launchGoogleGmailSignIn() },
+                        enabled = !googleLoading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .testTag("google_sign_in_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        if (googleLoading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Connecting Gmail...")
+                        } else {
+                            Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Continue with Gmail / Google")
                         }
                     }
                 }
-            } else {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.fillMaxWidth()
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                Text(
+                    text = "OR",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
+            // Card 2: Mobile Number OTP Login
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("auth_phone_otp_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Mobile Number OTP Login",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Enter your mobile number with country code (e.g. +919876543210). Requires Phone Auth + Play Integrity enabled in Firebase Console (gen-lang-client-0418089832).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Phone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "Mobile Number OTP Login",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(999.dp)
+                        ) {
+                            Text(
+                                text = "SMS OTP",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
 
-                        OutlinedTextField(
-                            value = phoneInput,
-                            onValueChange = { phoneInput = it },
-                            label = { Text("Mobile Number with Country Code") },
-                            placeholder = { Text("+919876543210") },
-                            leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("otp_phone_input")
-                        )
+                    Text(
+                        text = "Enter your mobile number with country code (e.g. +919876543210). Requires Phone Auth + Play Integrity enabled in Firebase Console (gen-lang-client-0418089832).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-                        when (val pState = phoneState) {
-                            is PhoneAuthState.CodeSent -> {
-                                OutlinedTextField(
-                                    value = otpCode,
-                                    onValueChange = { otpCode = it },
-                                    label = { Text("6-Digit OTP Code") },
-                                    leadingIcon = { Icon(Icons.Filled.Sms, contentDescription = null) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("otp_code_input")
-                                )
+                    OutlinedTextField(
+                        value = phoneInput,
+                        onValueChange = { phoneInput = it },
+                        label = { Text("Mobile Number with Country Code") },
+                        placeholder = { Text("+919876543210") },
+                        leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("otp_phone_input")
+                    )
 
-                                Button(
+                    when (val pState = phoneState) {
+                        is PhoneAuthState.CodeSent -> {
+                            OutlinedTextField(
+                                value = otpCode,
+                                onValueChange = { otpCode = it },
+                                label = { Text("6-Digit OTP Code") },
+                                leadingIcon = { Icon(Icons.Filled.Sms, contentDescription = null) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("otp_code_input")
+                            )
+
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        phoneAuthManager.verifyOtpCode(pState.verificationId, otpCode)
+                                    }
+                                },
+                                enabled = otpCode.trim().length >= 6,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                                    .testTag("verify_otp_button")
+                            ) {
+                                Text("Verify OTP & Sign In")
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextButton(onClick = { phoneAuthManager.reset() }) {
+                                    Text("Change Number")
+                                }
+                                TextButton(
                                     onClick = {
-                                        scope.launch {
-                                            phoneAuthManager.verifyOtpCode(pState.verificationId, otpCode)
+                                        if (activity != null) {
+                                            phoneAuthManager.startPhoneNumberVerification(
+                                                activity = activity,
+                                                rawPhoneNumber = phoneInput,
+                                                isResend = true
+                                            )
                                         }
-                                    },
-                                    enabled = otpCode.trim().length >= 6,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(50.dp)
-                                        .testTag("verify_otp_button")
-                                ) {
-                                    Text("Verify OTP & Sign In")
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    TextButton(onClick = { phoneAuthManager.reset() }) {
-                                        Text("Change Number")
                                     }
-                                    TextButton(
-                                        onClick = {
-                                            if (activity != null) {
-                                                phoneAuthManager.startPhoneNumberVerification(
-                                                    activity = activity,
-                                                    rawPhoneNumber = phoneInput,
-                                                    isResend = true
-                                                )
-                                            }
-                                        }
-                                    ) {
-                                        Text("Resend OTP")
-                                    }
+                                ) {
+                                    Text("Resend OTP")
                                 }
                             }
+                        }
 
-                            is PhoneAuthState.SendingCode, is PhoneAuthState.Verifying -> {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        if (pState is PhoneAuthState.SendingCode) "Requesting SMS OTP..." else "Verifying OTP..."
-                                    )
-                                }
-                            }
-
-                            is PhoneAuthState.Error -> {
+                        is PhoneAuthState.SendingCode, is PhoneAuthState.Verifying -> {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = pState.message,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    if (pState is PhoneAuthState.SendingCode) "Requesting SMS OTP..." else "Verifying OTP..."
                                 )
-                                if (pState.needsConsoleEnable) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            val projectId = runCatching {
-                                                FirebaseApp.getInstance().options.projectId
-                                            }.getOrNull()?.takeIf { !it.isNullOrBlank() }
-                                                ?: "gen-lang-client-0418089832"
-                                            runCatching {
-                                                context.startActivity(
-                                                    Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse("https://console.firebase.google.com/project/$projectId/authentication/providers")
-                                                    )
-                                                )
-                                            }.onFailure { err ->
-                                                authError = err.localizedMessage ?: "Unable to open browser."
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(48.dp)
-                                            .testTag("open_phone_auth_console_button")
-                                    ) {
-                                        Text("Enable Phone Auth in Firebase Console")
-                                    }
-                                    OutlinedButton(
-                                        onClick = {
-                                            selectedTab = 0
-                                            authError = null
-                                            phoneAuthManager.reset()
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(48.dp)
-                                            .testTag("switch_to_google_signin_button")
-                                    ) {
-                                        Text("Use Google Sign-In (Active Now)")
-                                    }
-                                }
-                                Button(
+                            }
+                        }
+
+                        is PhoneAuthState.Error -> {
+                            Text(
+                                text = pState.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            if (pState.needsConsoleEnable) {
+                                OutlinedButton(
                                     onClick = {
-                                        if (activity != null) {
-                                            phoneAuthManager.startPhoneNumberVerification(activity, phoneInput)
-                                        } else {
-                                            authError = "Activity context unavailable."
+                                        val projectId = runCatching {
+                                            FirebaseApp.getInstance().options.projectId
+                                        }.getOrNull()?.takeIf { !it.isNullOrBlank() }
+                                            ?: "gen-lang-client-0418089832"
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(
+                                                    Intent.ACTION_VIEW,
+                                                    Uri.parse("https://console.firebase.google.com/project/$projectId/authentication/providers")
+                                                )
+                                            )
+                                        }.onFailure { err ->
+                                            authError = err.localizedMessage ?: "Unable to open browser."
                                         }
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(50.dp)
-                                        .testTag("send_otp_button")
+                                        .height(48.dp)
+                                        .testTag("open_phone_auth_console_button")
                                 ) {
-                                    Text("Send OTP Again")
+                                    Text("Enable Phone Auth in Firebase Console")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        phoneAuthManager.reset()
+                                        launchGoogleGmailSignIn()
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("switch_to_google_signin_button")
+                                ) {
+                                    Text("Sign in with Gmail / Google Instead")
                                 }
                             }
+                            Button(
+                                onClick = {
+                                    if (activity != null) {
+                                        phoneAuthManager.startPhoneNumberVerification(activity, phoneInput)
+                                    } else {
+                                        authError = "Activity context unavailable."
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                                    .testTag("send_otp_button")
+                            ) {
+                                Text("Send OTP Again")
+                            }
+                        }
 
-                            else -> {
-                                Button(
-                                    onClick = {
-                                        if (activity != null) {
-                                            phoneAuthManager.startPhoneNumberVerification(activity, phoneInput)
-                                        } else {
-                                            authError = "Activity context unavailable."
-                                        }
-                                    },
-                                    enabled = phoneInput.trim().length >= 10,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(50.dp)
-                                        .testTag("send_otp_button")
-                                ) {
-                                    Text("Send Mobile OTP")
-                                }
+                        else -> {
+                            Button(
+                                onClick = {
+                                    if (activity != null) {
+                                        phoneAuthManager.startPhoneNumberVerification(activity, phoneInput)
+                                    } else {
+                                        authError = "Activity context unavailable."
+                                    }
+                                },
+                                enabled = phoneInput.trim().length >= 10,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                                    .testTag("send_otp_button")
+                            ) {
+                                Text("Send Mobile OTP")
                             }
                         }
                     }
@@ -470,7 +525,7 @@ fun AuthScreen(
                 ) {
                     Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                     Text(
-                        text = "Cloud Firestore & Google Sign-In are active. Tap here for Hindi instructions on enabling SMS Phone Auth, Firebase Storage, FCM Push & TURN servers.",
+                        text = "Cloud Firestore & Gmail (Google) Sign-In are active. Tap here for Hindi instructions on enabling SMS Phone Auth, Firebase Storage, FCM Push & TURN servers.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )

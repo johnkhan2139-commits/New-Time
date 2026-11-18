@@ -8,6 +8,8 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -92,12 +94,14 @@ object GoogleAuthManager {
         onAuthCancelled: () -> Unit = {}
     ) {
         val clientId = getWebClientId(context) ?: run {
-            onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
+            onAuthError(
+                "Google / Gmail Sign-In configuration missing: Web Client ID not found. Import your full google-services.json file."
+            )
             return
         }
         val activity = context as? Activity
         if (activity == null) {
-            onAuthError("Activity context required for Google Sign-In")
+            onAuthError("Activity context required for Google / Gmail Sign-In")
             return
         }
 
@@ -116,16 +120,28 @@ object GoogleAuthManager {
                     ).await()
                     onAuthSuccess()
                 } else {
-                    onAuthError("Unexpected credential type")
+                    onAuthError("Unexpected credential type returned by Google Play Services.")
                 }
             } catch (e: GetCredentialCancellationException) {
                 Log.w(TAG, "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
                 onAuthCancelled()
+            } catch (e: NoCredentialException) {
+                Log.e(TAG, "No Google credential available", e)
+                onAuthError(
+                    "No Gmail / Google account available on this device or SHA-1 mismatch. Add a Gmail account in Android Settings and use the matching APK."
+                )
+            } catch (e: GetCredentialException) {
+                Log.e(TAG, "Credential Manager error during Google Sign-In", e)
+                onAuthError(
+                    e.errorMessage?.toString()
+                        ?: e.localizedMessage
+                        ?: "Google / Gmail Sign-In failed. Verify Google Play Services and SHA-1 setup."
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Google Sign-In failed", e)
-                onAuthError(e.localizedMessage ?: "Sign in failed")
+                onAuthError(e.localizedMessage ?: "Google / Gmail Sign-In failed")
             }
         }
     }

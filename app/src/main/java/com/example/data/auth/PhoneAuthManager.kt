@@ -51,7 +51,7 @@ class PhoneAuthManager(
             _state.value = PhoneAuthState.Error("Firebase is not configured in this APK build.")
             return
         }
-        val formatted = rawPhoneNumber.trim().replace(" ", "")
+        val formatted = rawPhoneNumber.trim().replace(Regex("[\\s\\-()]"), "")
         if (!formatted.startsWith("+") || formatted.length < 10) {
             _state.value = PhoneAuthState.Error("Enter phone number with country code (e.g. +919876543210).")
             return
