@@ -233,4 +233,15 @@ class ExampleRobolectricTest {
         assertEquals("1234567890-webclient.apps.googleusercontent.com", parsed.webClientId)
         assertEquals("1234567890", parsed.gcmSenderId)
     }
+
+    @Test
+    fun `runtime firebase manual config validates required fields`() {
+        val missingKey = com.example.data.remote.RuntimeFirebaseConfig.importManualConfig(
+            context = context,
+            projectId = "demo-project",
+            applicationId = "1:123:android:abc",
+            apiKey = ""
+        )
+        assertTrue(missingKey.isFailure)
+    }
 }

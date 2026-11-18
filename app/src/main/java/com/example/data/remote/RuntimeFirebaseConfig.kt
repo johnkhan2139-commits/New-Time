@@ -60,12 +60,52 @@ object RuntimeFirebaseConfig {
 
     fun importFromJson(context: Context, rawJson: String): Result<Unit> {
         return try {
-            val parsed = parseGoogleServicesJson(rawJson, context.packageName)
+            val cleaned = rawJson
+                .trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val parsed = parseGoogleServicesJson(cleaned, context.packageName)
             val appContext = context.applicationContext
             saveConfig(appContext, parsed)
             initializeWithConfig(appContext, parsed)
         } catch (e: Exception) {
             Log.e(TAG, "Invalid google-services.json", e)
+            Result.failure(e)
+        }
+    }
+
+    fun importManualConfig(
+        context: Context,
+        projectId: String,
+        applicationId: String,
+        apiKey: String,
+        webClientId: String? = null
+    ): Result<Unit> {
+        return try {
+            val cleanProject = projectId.trim()
+            val cleanAppId = applicationId.trim()
+            val cleanApiKey = apiKey.trim()
+            val cleanWebClientId = webClientId?.trim()?.takeIf { it.isNotEmpty() }
+
+            require(cleanProject.isNotEmpty()) { "Firebase Project ID is required." }
+            require(cleanAppId.isNotEmpty()) { "Firebase Mobile App ID is required." }
+            require(cleanApiKey.isNotEmpty()) { "Firebase API Key is required." }
+
+            val config = ParsedGoogleServices(
+                projectId = cleanProject,
+                applicationId = cleanAppId,
+                apiKey = cleanApiKey,
+                storageBucket = "$cleanProject.firebasestorage.app",
+                gcmSenderId = null,
+                webClientId = cleanWebClientId
+            )
+            val appContext = context.applicationContext
+            saveConfig(appContext, config)
+            initializeWithConfig(appContext, config)
+        } catch (e: Exception) {
+            Log.e(TAG, "Manual Firebase config failed", e)
             Result.failure(e)
         }
     }

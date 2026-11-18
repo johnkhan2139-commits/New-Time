@@ -129,7 +129,9 @@ fun FirebaseGuideScreen(
         "7. Android APK बिल्ड निर्देश (Build Commands)" to
             "Debug APK के लिए: gradle :app:assembleDebug\nRelease APK के लिए: KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD सेट करके gradle :app:assembleRelease चलाएं (या GitHub Actions Release APK वर्कफ़्लो से डाउनलोड करें)।",
         "8. iPhone (iOS) वर्ज़न कैसे बिल्ड करें (Xcode / macOS)" to
-            "यह Android बिल्ड सर्वर केवल Android APK बना सकता है, iOS (.ipa) नहीं। हालांकि रिपॉजिटरी के /ios-companion/ फ़ोल्डर में iPhone के लिए SwiftUI + Firebase + WebRTC (devicePlatform = 'IPHONE') सोर्स कोड दे दिया गया है। Mac पर Xcode में प्रोजेक्ट खोलें, GoogleService-Info.plist (प्रोजेक्ट: gen-lang-client-0418089832) जोड़ें और App Store / TestFlight पर चलाएं — Android और iPhone यूज़र एक साथ चैट और कॉल कर सकेंगे।"
+            "यह Android बिल्ड सर्वर केवल Android APK बना सकता है, iOS (.ipa) नहीं। हालांकि रिपॉजिटरी के /ios-companion/ फ़ोल्डर में iPhone के लिए SwiftUI + Firebase + WebRTC (devicePlatform = 'IPHONE') सोर्स कोड दे दिया गया है। Mac पर Xcode में प्रोजेक्ट खोलें, GoogleService-Info.plist (प्रोजेक्ट: gen-lang-client-0418089832) जोड़ें और App Store / TestFlight पर चलाएं — Android और iPhone यूज़र एक साथ चैट और कॉल कर सकेंगे।",
+        "9. GitHub Actions APK में google-services.json ऑटो-बंडल कैसे करें" to
+            "Push to GitHub के समय सुरक्षा के लिए google-services.json रिपॉजिटरी में नहीं जाता। इसे ऑटोमैटिक जोड़ने के लिए: GitHub रिपॉजिटरी -> Settings -> Secrets and variables -> Actions -> New repository secret खोलें, Name में GOOGLE_SERVICES_JSON लिखें और AI Studio के app/google-services.json का पूरा JSON पेस्ट करें। इसके बाद हर GitHub APK बिल्ड अपने-आप तैयार खुलेगा।"
     )
 
     Scaffold(

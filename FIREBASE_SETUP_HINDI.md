@@ -40,6 +40,11 @@ gradle :app:assembleRelease
 ```
 आउटपुट पाथ: `app/build/outputs/apk/release/app-release.apk`
 
+### GitHub Actions से APK बनाते समय Firebase Config (`GOOGLE_SERVICES_JSON`):
+- AI Studio से GitHub push करते समय सुरक्षा कारणों से `app/google-services.json` रिपॉजिटरी में नहीं जाता।
+- GitHub APK में इसे ऑटोमैटिक जोड़ने के लिए GitHub रिपॉजिटरी के **Settings → Secrets and variables → Actions → New repository secret** में **`GOOGLE_SERVICES_JSON`** नाम से नया secret बनाएं और `app/google-services.json` का पूरा JSON पेस्ट करें।
+- इसके अलावा ऐप के अंदर भी **Import `google-services.json` File**, **Paste Text**, या **Enter Firebase Keys Manually** विकल्प मौजूद हैं।
+
 ---
 
 ## 3. iPhone (iOS) वर्ज़न के लिए निर्देश

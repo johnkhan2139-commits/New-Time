@@ -240,7 +240,8 @@ class WebRtcCallManager(
                     mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
                 }
                 pc.createAnswer(object : SdpObserverAdapter() {
-                    override fun onCreateSuccess(answer: SessionDescription?) {
+                    override fun onCreateSuccess(sdp: SessionDescription?) {
+                        val answer = sdp
                         if (answer == null) {
                             onError("Empty SDP answer")
                             return

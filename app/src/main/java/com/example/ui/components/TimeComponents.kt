@@ -146,7 +146,7 @@ fun AvatarCircle(
     isOnline: Boolean? = null,
     modifier: Modifier = Modifier
 ) {
-    val fileExists = avatarPath?.let { File(it).exists() } == true
+    val avatarFile = remember(avatarPath) { avatarPath?.let(::File)?.takeIf { it.exists() } }
     val avatarBytes = remember(avatarBase64) { OnlineMediaHelper.decodeBase64Bytes(avatarBase64) }
     val initials = name.trim()
         .split(" ")
@@ -182,9 +182,9 @@ fun AvatarCircle(
                     )
                 }
 
-                fileExists && avatarPath != null -> {
+                avatarFile != null -> {
                     AsyncImage(
-                        model = File(avatarPath),
+                        model = avatarFile,
                         contentDescription = "$name avatar",
                         modifier = Modifier
                             .size(size)

@@ -1,6 +1,7 @@
 package com.example.ui.navigation
 
-import android.app.Activity
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -33,6 +35,8 @@ import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +86,7 @@ import com.example.data.remote.OnlineMediaHelper
 import com.example.data.remote.OnlineRepository
 import com.example.data.remote.RuntimeFirebaseConfig
 import com.example.ui.components.AvatarCircle
+import com.example.ui.components.TimeBrandHeader
 import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
@@ -214,7 +219,13 @@ private fun FirebaseMissingConfigScreen(
     val context = LocalContext.current
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showPasteDialog by remember { mutableStateOf(false) }
+    var showManualDialog by remember { mutableStateOf(false) }
     var pastedJson by remember { mutableStateOf("") }
+
+    var manualProjectId by remember { mutableStateOf("gen-lang-client-0418089832") }
+    var manualAppId by remember { mutableStateOf("") }
+    var manualApiKey by remember { mutableStateOf("") }
+    var manualWebClientId by remember { mutableStateOf("") }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -235,29 +246,42 @@ private fun FirebaseMissingConfigScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
                     .widthIn(max = 520.dp)
                     .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = "TIME • Firebase Setup Needed",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Is GitHub APK build me app/google-services.json include nahi hai (AI Studio Push to GitHub security ke liye API keys exclude karta hai).\n\n" +
-                        "Fix karne ke 2 aasaan tarike:\n" +
-                        "1. AI Studio me Settings → Generate APK se seedha APK download karein (usme config pehle se included hoti hai), YA\n" +
-                        "2. Niche apna google-services.json file select ya paste karein.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                TimeBrandHeader()
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Firebase Config Setup",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "GitHub se bane APK me app/google-services.json security reason se bundled nahi hota.\n\n" +
+                                "• Sabse Aasaan: AI Studio me Settings → Generate APK se APK download karein (usme config pehle se hoti hai).\n" +
+                                "• GitHub Permanent Fix: GitHub repo → Settings → Secrets → Actions me GOOGLE_SERVICES_JSON secret add karein.\n" +
+                                "• Ya niche file import / paste / manual keys daalkar turant chalu karein:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
                 if (errorMessage != null) {
                     Text(
@@ -287,7 +311,20 @@ private fun FirebaseMissingConfigScreen(
                     Text("Paste google-services.json Text")
                 }
 
-                TextButton(onClick = onOpenGuide) {
+                OutlinedButton(
+                    onClick = { showManualDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("manual_firebase_config_button")
+                ) {
+                    Text("Enter Firebase Keys Manually")
+                }
+
+                TextButton(
+                    onClick = onOpenGuide,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
                     Text("Open Firebase Setup Guide (हिन्दी)")
                 }
             }
@@ -299,14 +336,27 @@ private fun FirebaseMissingConfigScreen(
             onDismissRequest = { showPasteDialog = false },
             title = { Text("Paste google-services.json") },
             text = {
-                OutlinedTextField(
-                    value = pastedJson,
-                    onValueChange = { pastedJson = it },
-                    label = { Text("JSON content") },
-                    minLines = 5,
-                    maxLines = 8,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = pastedJson,
+                        onValueChange = { pastedJson = it },
+                        label = { Text("JSON content") },
+                        minLines = 4,
+                        maxLines = 8,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            val clipText = clipboard?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()
+                            if (!clipText.isNullOrBlank()) {
+                                pastedJson = clipText
+                            }
+                        }
+                    ) {
+                        Text("Paste from Clipboard")
+                    }
+                }
             },
             confirmButton = {
                 Button(
@@ -327,6 +377,74 @@ private fun FirebaseMissingConfigScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showPasteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showManualDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualDialog = false },
+            title = { Text("Enter Firebase Keys") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = manualProjectId,
+                        onValueChange = { manualProjectId = it },
+                        label = { Text("Project ID") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = manualAppId,
+                        onValueChange = { manualAppId = it },
+                        label = { Text("Mobile App ID (1:...:android:...)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = manualApiKey,
+                        onValueChange = { manualApiKey = it },
+                        label = { Text("API Key (AIza...)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = manualWebClientId,
+                        onValueChange = { manualWebClientId = it },
+                        label = { Text("Web Client ID (optional, for Google Sign-In)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        RuntimeFirebaseConfig.importManualConfig(
+                            context = context,
+                            projectId = manualProjectId,
+                            applicationId = manualAppId,
+                            apiKey = manualApiKey,
+                            webClientId = manualWebClientId
+                        ).onSuccess {
+                            showManualDialog = false
+                            onConfigured()
+                        }.onFailure { err ->
+                            errorMessage = err.localizedMessage ?: "Invalid Firebase details."
+                            showManualDialog = false
+                        }
+                    }
+                ) {
+                    Text("Activate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManualDialog = false }) {
                     Text("Cancel")
                 }
             }
