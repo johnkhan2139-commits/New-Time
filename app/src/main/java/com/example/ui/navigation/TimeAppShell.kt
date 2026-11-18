@@ -2,6 +2,8 @@ package com.example.ui.navigation
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -377,6 +379,23 @@ private fun FirebaseMissingConfigScreen(
                         .testTag("manual_firebase_config_button")
                 ) {
                     Text("Enter Firebase Keys Manually")
+                }
+
+                TextButton(
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://console.firebase.google.com/project/gen-lang-client-0418089832/settings/general")
+                            )
+                            context.startActivity(intent)
+                        }.onFailure { err ->
+                            errorMessage = err.localizedMessage ?: "Unable to open browser."
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Download google-services.json from Firebase Console")
                 }
 
                 TextButton(
